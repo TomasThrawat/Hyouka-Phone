@@ -5,6 +5,10 @@ on:
     branches: ["main"]
   workflow_dispatch:
 
+concurrency:
+  group: flutter-android-main
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -18,11 +22,14 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Generate Android platform files
-        run: flutter create --platforms=android --project-name=hyouka_phone --org=com.hyouka .
+      - name: Generate Android host
+        run: flutter create --platforms=android --project-name=hyouka_phone --org=com.hyouka --no-pub .
 
-      - name: Verify dependencies
+      - name: Resolve dependencies
         run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze
 
       - name: Run tests
         run: flutter test --reporter expanded

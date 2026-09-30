@@ -1,14 +1,15 @@
 name: hyouka_phone
-description: A clean Flutter phone dialer with native Android calling.
+description: A Flutter phone dialer with native phone-app integration.
 publish_to: "none"
 version: 1.0.0+1
 
 environment:
-  sdk: ">=3.5.0 <4.0.0"
+  sdk: ">=3.6.0 <4.0.0"
 
 dependencies:
   flutter:
     sdk: flutter
+  url_launcher: ^6.3.2
 
 dev_dependencies:
   flutter_test:

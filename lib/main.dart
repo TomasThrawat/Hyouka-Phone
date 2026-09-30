@@ -1,10 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-
-const _callChannel = MethodChannel('hyouka_phone/calls');
+import 'package:url_launcher/url_launcher.dart';
 
 void main() {
-  WidgetsFlutterBinding.ensureInitialized();
   runApp(const HyoukaPhoneApp());
 }
 
@@ -31,7 +28,11 @@ class HyoukaPhoneApp extends StatelessWidget {
 }
 
 class CallEntry {
-  const CallEntry({required this.number, required this.time});
+  const CallEntry({
+    required this.number,
+    required this.time,
+  });
+
   final String number;
   final DateTime time;
 }
@@ -73,28 +74,36 @@ class _PhoneHomePageState extends State<PhoneHomePage> {
   }
 
   Future<void> _call() async {
-    final normalized = _number.replaceAll(RegExp('[\\s()-]'), '');
+    final normalized = _number.replaceAll(RegExp(r'[\s()-]'), '');
     if (normalized.isEmpty) {
       _showMessage('Enter a phone number first.');
       return;
     }
 
-    try {
-      await _callChannel.invokeMethod<void>('placeCall', normalized);
-      setState(() {
-        _recents.insert(0, CallEntry(number: normalized, time: DateTime.now()));
-        if (_recents.length > 20) _recents.removeLast();
-      });
-    } on PlatformException catch (error) {
-      _showMessage(error.message ?? 'Unable to place the call.');
-    } catch (_) {
-      _showMessage('Unable to place the call.');
+    final uri = Uri(scheme: 'tel', path: normalized);
+    final launched = await launchUrl(uri);
+
+    if (!launched) {
+      _showMessage('No phone app is available for this number.');
+      return;
     }
+
+    setState(() {
+      _recents.insert(
+        0,
+        CallEntry(number: normalized, time: DateTime.now()),
+      );
+      if (_recents.length > 20) {
+        _recents.removeLast();
+      }
+    });
   }
 
   void _showMessage(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
   }
 
   String _formatTime(DateTime time) {
@@ -124,7 +133,9 @@ class _PhoneHomePageState extends State<PhoneHomePage> {
                   const Spacer(),
                   IconButton(
                     tooltip: 'Clear number',
-                    onPressed: _number.isEmpty ? null : () => setState(() => _number = ''),
+                    onPressed: _number.isEmpty
+                        ? null
+                        : () => setState(() => _number = ''),
                     icon: const Icon(Icons.clear_all_rounded),
                   ),
                 ],
@@ -133,7 +144,10 @@ class _PhoneHomePageState extends State<PhoneHomePage> {
             Expanded(
               child: IndexedStack(
                 index: _tab,
-                children: [_buildKeypad(), _buildRecents()],
+                children: [
+                  _buildKeypad(),
+                  _buildRecents(),
+                ],
               ),
             ),
             NavigationBar(
@@ -221,7 +235,12 @@ class _PhoneHomePageState extends State<PhoneHomePage> {
 
   Widget _buildRecents() {
     if (_recents.isEmpty) {
-      return const Center(child: Text('No recent calls', style: TextStyle(fontSize: 17)));
+      return const Center(
+        child: Text(
+          'No recent calls',
+          style: TextStyle(fontSize: 17),
+        ),
+      );
     }
 
     return ListView.separated(
@@ -231,9 +250,13 @@ class _PhoneHomePageState extends State<PhoneHomePage> {
       itemBuilder: (context, index) {
         final entry = _recents[index];
         return ListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 8,
+            vertical: 4,
+          ),
           leading: CircleAvatar(
-            backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+            backgroundColor:
+                Theme.of(context).colorScheme.surfaceContainerHighest,
             child: const Icon(Icons.call_made_rounded),
           ),
           title: Text(entry.number),
@@ -268,7 +291,8 @@ class _DialKey extends StatelessWidget {
     return FilledButton(
       onPressed: onTap,
       style: FilledButton.styleFrom(
-        backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+        backgroundColor:
+            Theme.of(context).colorScheme.surfaceContainerHighest,
         foregroundColor: Theme.of(context).colorScheme.onSurface,
         shape: const CircleBorder(),
         padding: EdgeInsets.zero,
@@ -278,7 +302,11 @@ class _DialKey extends StatelessWidget {
         children: [
           Text(
             value,
-            style: const TextStyle(fontSize: 27, fontWeight: FontWeight.w400, height: 1.0),
+            style: const TextStyle(
+              fontSize: 27,
+              fontWeight: FontWeight.w400,
+              height: 1.0,
+            ),
           ),
           if (letters.isNotEmpty)
             Text(
