@@ -1,30 +1,23 @@
-# Hyouka Phone
+# هاتف
 
-Flutter/Dart phone dialer with a Material 3 dark interface.
+تطبيق هاتف Flutter/Dart بواجهة سوداء بالكامل.
 
-## Features
+## الوظائف
 
-- Dial keypad for 0-9, * and #
-- Delete and clear controls
-- Opens the Android phone app with a `tel:` URI
-- Recent calls for the current app session
-- Call again from recents
-- Responsive keypad layout that avoids vertical overflow on compact screens
-- Flutter widget tests
-- Flutter static analysis in CI
-- Debug APK build in GitHub Actions
-
-## Run
-
-```bash
-flutter pub get
-flutter run
-```
+- لوحة أرقام من 0 إلى 9 و * و # بدون حروف إنجليزية تحت الأرقام.
+- أرقام أزرار صغيرة ومنخفضة داخل الواجهة.
+- إظهار جهات الاتصال المطابقة للرقم المكتوب.
+- عند اختيار جهة اتصال أو رقم من المكالمات الحديثة يظهر زرا اتصال وإلغاء.
+- المكالمات الحديثة تعمل بجلسة التطبيق وتفتح تطبيق الهاتف عبر tel URI.
+- اسم التطبيق: هاتف
+- Android applicationId: com.dailer.phone
+- إصدار Android المرفوع إلى GitHub Actions: arm64-v8a فقط.
 
 ## Build
 
 ```bash
-flutter test
+flutter pub get
 flutter analyze
-flutter build apk --debug
+flutter test
+flutter build apk --release --split-per-abi --target-platform android-arm64
 ```
