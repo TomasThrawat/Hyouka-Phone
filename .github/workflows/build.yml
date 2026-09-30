@@ -490,6 +490,15 @@ jobs:
                   String title = currentCall.getDetails().getHandle() == null
                       ? "مكالمة"
                       : currentCall.getDetails().getHandle().getSchemeSpecificPart();
+                  if (Build.VERSION.SDK_INT >= 30) {
+                      String contactName = currentCall.getDetails().getContactDisplayName();
+                      if (contactName != null && !contactName.trim().isEmpty()) {
+                          title = contactName.trim();
+                      }
+                  }
+                  if (title == null || title.trim().isEmpty()) {
+                      title = "مكالمة";
+                  }
 
                   Notification.Builder builder;
                   if (Build.VERSION.SDK_INT >= 26) {
@@ -562,11 +571,13 @@ jobs:
           import android.content.IntentFilter;
           import android.graphics.Color;
           import android.graphics.Typeface;
+          import android.graphics.drawable.GradientDrawable;
           import android.os.Build;
           import android.os.Bundle;
           import android.os.Handler;
           import android.os.Looper;
           import android.telecom.Call;
+          import android.text.TextUtils;
           import android.view.Gravity;
           import android.view.View;
           import android.view.Window;
@@ -574,20 +585,28 @@ jobs:
           import android.widget.Button;
           import android.widget.LinearLayout;
           import android.widget.ScrollView;
+          import android.widget.Space;
           import android.widget.TextView;
 
           import java.util.Locale;
 
           public class InCallActivity extends Activity {
               private final Handler handler = new Handler(Looper.getMainLooper());
+
+              private TextView avatarView;
+              private TextView nameView;
               private TextView numberView;
               private TextView statusView;
               private TextView timerView;
+
+              private LinearLayout incomingActions;
+              private LinearLayout ongoingActions;
               private Button answerButton;
               private Button rejectButton;
               private Button muteButton;
               private Button speakerButton;
               private Button endButton;
+
               private long connectTimeMillis;
 
               private final BroadcastReceiver receiver = new BroadcastReceiver() {
@@ -616,6 +635,8 @@ jobs:
                   Window window = getWindow();
                   configureLockScreen(this, window);
                   window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                  window.setStatusBarColor(Color.BLACK);
+                  window.setNavigationBarColor(Color.BLACK);
 
                   buildUi();
                   registerCallReceiver();
@@ -642,80 +663,33 @@ jobs:
                   }
               }
 
-              private void buildUi() {
-                  ScrollView scroll = new ScrollView(this);
-                  scroll.setFillViewport(true);
+              private int dp(float value) {
+                  return Math.round(value * getResources().getDisplayMetrics().density);
+              }
 
-                  LinearLayout root = new LinearLayout(this);
-                  root.setOrientation(LinearLayout.VERTICAL);
-                  root.setGravity(Gravity.CENTER_HORIZONTAL);
-                  root.setPadding(32, 64, 32, 40);
-                  root.setBackgroundColor(Color.BLACK);
+              private GradientDrawable roundedBackground(
+                  int color,
+                  float radius,
+                  int strokeColor,
+                  int strokeWidth
+              ) {
+                  GradientDrawable drawable = new GradientDrawable();
+                  drawable.setColor(color);
+                  drawable.setCornerRadius(dp(radius));
+                  if (strokeWidth > 0) {
+                      drawable.setStroke(dp(strokeWidth), strokeColor);
+                  }
+                  return drawable;
+              }
 
-                  TextView app = makeText("هاتف", 18, Color.LTGRAY);
-                  root.addView(app, matchWrap());
-
-                  numberView = makeText("مكالمة", 32, Color.WHITE);
-                  numberView.setGravity(Gravity.CENTER);
-                  numberView.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-                  LinearLayout.LayoutParams numberParams = matchWrap();
-                  numberParams.topMargin = 90;
-                  root.addView(numberView, numberParams);
-
-                  statusView = makeText("", 18, Color.LTGRAY);
-                  statusView.setGravity(Gravity.CENTER);
-                  LinearLayout.LayoutParams statusParams = matchWrap();
-                  statusParams.topMargin = 14;
-                  root.addView(statusView, statusParams);
-
-                  timerView = makeText("", 18, Color.GRAY);
-                  timerView.setGravity(Gravity.CENTER);
-                  LinearLayout.LayoutParams timerParams = matchWrap();
-                  timerParams.topMargin = 8;
-                  root.addView(timerView, timerParams);
-
-                  LinearLayout incoming = new LinearLayout(this);
-                  incoming.setGravity(Gravity.CENTER);
-                  LinearLayout.LayoutParams incomingParams = matchWrap();
-                  incomingParams.topMargin = 44;
-
-                  answerButton = makeButton("رد");
-                  answerButton.setOnClickListener(v -> PhoneInCallService.answer());
-                  incoming.addView(answerButton, actionParams());
-
-                  rejectButton = makeButton("رفض");
-                  rejectButton.setOnClickListener(v -> PhoneInCallService.reject());
-                  incoming.addView(rejectButton, actionParams());
-
-                  root.addView(incoming, incomingParams);
-
-                  LinearLayout ongoing = new LinearLayout(this);
-                  ongoing.setGravity(Gravity.CENTER);
-                  LinearLayout.LayoutParams ongoingParams = matchWrap();
-                  ongoingParams.topMargin = 16;
-
-                  muteButton = makeButton("كتم");
-                  muteButton.setOnClickListener(
-                      v -> PhoneInCallService.setMutedState(!PhoneInCallService.isMutedState())
-                  );
-                  ongoing.addView(muteButton, actionParams());
-
-                  speakerButton = makeButton("السماعة");
-                  speakerButton.setOnClickListener(v -> PhoneInCallService.toggleSpeaker());
-                  ongoing.addView(speakerButton, actionParams());
-
-                  root.addView(ongoing, ongoingParams);
-
-                  endButton = makeButton("إنهاء");
-                  endButton.setOnClickListener(v -> PhoneInCallService.disconnect());
-                  endButton.setTextColor(Color.WHITE);
-                  endButton.setBackgroundColor(Color.rgb(150, 35, 35));
-                  LinearLayout.LayoutParams endParams = new LinearLayout.LayoutParams(300, 64);
-                  endParams.topMargin = 34;
-                  root.addView(endButton, endParams);
-
-                  scroll.addView(root);
-                  setContentView(scroll);
+              private GradientDrawable circleBackground(int color, int strokeColor, int strokeWidth) {
+                  GradientDrawable drawable = new GradientDrawable();
+                  drawable.setShape(GradientDrawable.OVAL);
+                  drawable.setColor(color);
+                  if (strokeWidth > 0) {
+                      drawable.setStroke(dp(strokeWidth), strokeColor);
+                  }
+                  return drawable;
               }
 
               private TextView makeText(String value, float size, int color) {
@@ -723,17 +697,49 @@ jobs:
                   view.setText(value);
                   view.setTextSize(size);
                   view.setTextColor(color);
+                  view.setGravity(Gravity.CENTER);
                   return view;
               }
 
-              private Button makeButton(String label) {
+              private Button makeActionButton(String label, int backgroundColor, int strokeColor) {
                   Button button = new Button(this);
                   button.setText(label);
-                  button.setTextSize(16);
+                  button.setTextSize(15);
                   button.setAllCaps(false);
+                  button.setGravity(Gravity.CENTER);
+                  button.setPadding(0, 0, 0, 0);
                   button.setTextColor(Color.WHITE);
-                  button.setBackgroundColor(Color.rgb(35, 35, 35));
+                  button.setMinHeight(0);
+                  button.setMinWidth(0);
+                  button.setBackground(circleBackground(backgroundColor, strokeColor, 1));
                   return button;
+              }
+
+              private Button makeControlButton(String label) {
+                  Button button = new Button(this);
+                  button.setText(label);
+                  button.setTextSize(14);
+                  button.setAllCaps(false);
+                  button.setGravity(Gravity.CENTER);
+                  button.setTextColor(Color.WHITE);
+                  button.setPadding(dp(12), 0, dp(12), 0);
+                  button.setBackground(
+                      roundedBackground(
+                          Color.rgb(24, 24, 24),
+                          18f,
+                          Color.rgb(56, 56, 56),
+                          1
+                      )
+                  );
+                  return button;
+              }
+
+              private LinearLayout.LayoutParams weightParams(float weight) {
+                  return new LinearLayout.LayoutParams(
+                      0,
+                      LinearLayout.LayoutParams.WRAP_CONTENT,
+                      weight
+                  );
               }
 
               private LinearLayout.LayoutParams matchWrap() {
@@ -743,11 +749,179 @@ jobs:
                   );
               }
 
-              private LinearLayout.LayoutParams actionParams() {
-                  LinearLayout.LayoutParams params =
-                      new LinearLayout.LayoutParams(0, 62, 1);
-                  params.setMargins(8, 0, 8, 0);
-                  return params;
+              private LinearLayout.LayoutParams fixed(int width, int height) {
+                  return new LinearLayout.LayoutParams(dp(width), dp(height));
+              }
+
+              private void addActionColumn(
+                  LinearLayout parent,
+                  Button button,
+                  String label,
+                  int leftMargin,
+                  int rightMargin
+              ) {
+                  LinearLayout column = new LinearLayout(this);
+                  column.setOrientation(LinearLayout.VERTICAL);
+                  column.setGravity(Gravity.CENTER_HORIZONTAL);
+
+                  LinearLayout.LayoutParams columnParams = weightParams(1f);
+                  columnParams.setMargins(dp(leftMargin), 0, dp(rightMargin), 0);
+                  parent.addView(column, columnParams);
+
+                  column.addView(button, fixed(82, 82));
+
+                  TextView labelView = makeText(
+                      label,
+                      13,
+                      Color.rgb(190, 190, 190)
+                  );
+                  LinearLayout.LayoutParams labelParams = matchWrap();
+                  labelParams.topMargin = dp(10);
+                  column.addView(labelView, labelParams);
+              }
+
+              private void buildUi() {
+                  ScrollView scroll = new ScrollView(this);
+                  scroll.setFillViewport(true);
+                  scroll.setBackgroundColor(Color.BLACK);
+
+                  LinearLayout root = new LinearLayout(this);
+                  root.setOrientation(LinearLayout.VERTICAL);
+                  root.setGravity(Gravity.CENTER_HORIZONTAL);
+                  root.setMinimumHeight(getResources().getDisplayMetrics().heightPixels);
+                  root.setPadding(dp(22), dp(18), dp(22), dp(28));
+                  root.setBackgroundColor(Color.BLACK);
+
+                  TextView app = makeText("هاتف", 16, Color.rgb(170, 170, 170));
+                  app.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+                  root.addView(app, matchWrap());
+
+                  Space topSpace = new Space(this);
+                  root.addView(topSpace, new LinearLayout.LayoutParams(1, 0, 0.35f));
+
+                  LinearLayout avatarFrame = new LinearLayout(this);
+                  avatarFrame.setGravity(Gravity.CENTER);
+                  avatarFrame.setBackground(
+                      circleBackground(
+                          Color.rgb(28, 28, 28),
+                          Color.rgb(52, 52, 52),
+                          1
+                      )
+                  );
+                  avatarFrame.setPadding(dp(8), dp(8), dp(8), dp(8));
+
+                  avatarView = makeText("?", 44, Color.WHITE);
+                  avatarView.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+                  avatarView.setBackground(
+                      circleBackground(Color.rgb(45, 45, 45), Color.TRANSPARENT, 0)
+                  );
+                  avatarFrame.addView(avatarView, fixed(104, 104));
+                  root.addView(avatarFrame, fixed(120, 120));
+
+                  statusView = makeText(
+                      "مكالمة واردة",
+                      17,
+                      Color.rgb(170, 170, 170)
+                  );
+                  LinearLayout.LayoutParams statusParams = matchWrap();
+                  statusParams.topMargin = dp(22);
+                  root.addView(statusView, statusParams);
+
+                  nameView = makeText("رقم غير معروف", 30, Color.WHITE);
+                  nameView.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+                  nameView.setEllipsize(TextUtils.TruncateAt.END);
+                  nameView.setMaxLines(1);
+                  LinearLayout.LayoutParams nameParams = matchWrap();
+                  nameParams.topMargin = dp(8);
+                  root.addView(nameView, nameParams);
+
+                  numberView = makeText("", 17, Color.rgb(185, 185, 185));
+                  numberView.setEllipsize(TextUtils.TruncateAt.END);
+                  numberView.setMaxLines(1);
+                  LinearLayout.LayoutParams numberParams = matchWrap();
+                  numberParams.topMargin = dp(6);
+                  root.addView(numberView, numberParams);
+
+                  timerView = makeText("", 15, Color.rgb(105, 105, 105));
+                  LinearLayout.LayoutParams timerParams = matchWrap();
+                  timerParams.topMargin = dp(6);
+                  root.addView(timerView, timerParams);
+
+                  Space actionSpace = new Space(this);
+                  root.addView(
+                      actionSpace,
+                      new LinearLayout.LayoutParams(1, 0, 0.9f)
+                  );
+
+                  incomingActions = new LinearLayout(this);
+                  incomingActions.setOrientation(LinearLayout.HORIZONTAL);
+                  incomingActions.setGravity(Gravity.CENTER);
+                  LinearLayout.LayoutParams incomingParams = matchWrap();
+                  incomingParams.bottomMargin = dp(14);
+
+                  rejectButton = makeActionButton(
+                      "رفض",
+                      Color.rgb(165, 42, 42),
+                      Color.rgb(210, 85, 85)
+                  );
+                  rejectButton.setContentDescription("رفض المكالمة");
+                  rejectButton.setOnClickListener(v -> PhoneInCallService.reject());
+
+                  answerButton = makeActionButton(
+                      "رد",
+                      Color.rgb(38, 150, 70),
+                      Color.rgb(77, 200, 105)
+                  );
+                  answerButton.setContentDescription("الرد على المكالمة");
+                  answerButton.setOnClickListener(v -> PhoneInCallService.answer());
+
+                  addActionColumn(incomingActions, rejectButton, "رفض", 8, 22);
+                  addActionColumn(incomingActions, answerButton, "رد", 22, 8);
+                  root.addView(incomingActions, incomingParams);
+
+                  ongoingActions = new LinearLayout(this);
+                  ongoingActions.setOrientation(LinearLayout.HORIZONTAL);
+                  ongoingActions.setGravity(Gravity.CENTER);
+                  LinearLayout.LayoutParams ongoingParams = matchWrap();
+                  ongoingParams.bottomMargin = dp(14);
+
+                  muteButton = makeControlButton("كتم");
+                  muteButton.setOnClickListener(
+                      v -> PhoneInCallService.setMutedState(
+                          !PhoneInCallService.isMutedState()
+                      )
+                  );
+
+                  speakerButton = makeControlButton("السماعة");
+                  speakerButton.setOnClickListener(
+                      v -> PhoneInCallService.toggleSpeaker()
+                  );
+
+                  LinearLayout.LayoutParams controlParams = weightParams(1f);
+                  controlParams.setMargins(dp(6), 0, dp(6), 0);
+                  ongoingActions.addView(muteButton, controlParams);
+
+                  controlParams = weightParams(1f);
+                  controlParams.setMargins(dp(6), 0, dp(6), 0);
+                  ongoingActions.addView(speakerButton, controlParams);
+
+                  root.addView(ongoingActions, ongoingParams);
+
+                  endButton = makeActionButton(
+                      "إنهاء",
+                      Color.rgb(165, 42, 42),
+                      Color.rgb(210, 85, 85)
+                  );
+                  endButton.setContentDescription("إنهاء المكالمة");
+                  endButton.setOnClickListener(v -> PhoneInCallService.disconnect());
+
+                  LinearLayout endRow = new LinearLayout(this);
+                  endRow.setGravity(Gravity.CENTER);
+                  endRow.addView(endButton, fixed(82, 82));
+                  root.addView(endRow, matchWrap());
+
+                  scroll.addView(root);
+                  setContentView(scroll);
               }
 
               private void registerCallReceiver() {
@@ -755,10 +929,53 @@ jobs:
                   filter.addAction(PhoneInCallService.ACTION_CALL_UPDATED);
                   filter.addAction(PhoneInCallService.ACTION_CALL_FINISHED);
                   if (Build.VERSION.SDK_INT >= 33) {
-                      registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED);
+                      registerReceiver(
+                          receiver,
+                          filter,
+                          Context.RECEIVER_NOT_EXPORTED
+                      );
                   } else {
                       registerReceiver(receiver, filter);
                   }
+              }
+
+              private String safeNumber(Call call) {
+                  if (call == null || call.getDetails() == null) {
+                      return "";
+                  }
+                  if (call.getDetails().getHandle() == null) {
+                      return "";
+                  }
+                  String number = call.getDetails().getHandle().getSchemeSpecificPart();
+                  return number == null ? "" : number;
+              }
+
+              private String safeCallerName(Call call) {
+                  if (call == null || call.getDetails() == null) {
+                      return null;
+                  }
+
+                  if (Build.VERSION.SDK_INT >= 30) {
+                      String contactName = call.getDetails().getContactDisplayName();
+                      if (!TextUtils.isEmpty(contactName)) {
+                          return contactName.trim();
+                      }
+                  }
+
+                  String callerName = call.getDetails().getCallerDisplayName();
+                  if (!TextUtils.isEmpty(callerName)) {
+                      return callerName.trim();
+                  }
+
+                  return null;
+              }
+
+              private String avatarLetter(String name, String number) {
+                  String source = !TextUtils.isEmpty(name) ? name : number;
+                  if (TextUtils.isEmpty(source)) {
+                      return "?";
+                  }
+                  return source.substring(0, 1).toUpperCase(Locale.getDefault());
               }
 
               private void render() {
@@ -768,10 +985,25 @@ jobs:
                       return;
                   }
 
-                  String number = call.getDetails().getHandle() == null
-                      ? "مكالمة"
-                      : call.getDetails().getHandle().getSchemeSpecificPart();
-                  numberView.setText(number);
+                  String number = safeNumber(call);
+                  String callerName = safeCallerName(call);
+
+                  if (TextUtils.isEmpty(callerName)) {
+                      nameView.setText(
+                          TextUtils.isEmpty(number)
+                              ? "رقم غير معروف"
+                              : "رقم غير محفوظ"
+                      );
+                  } else {
+                      nameView.setText(callerName);
+                  }
+
+                  numberView.setText(
+                      TextUtils.isEmpty(number)
+                          ? "رقم مخفي أو غير متاح"
+                          : number
+                  );
+                  avatarView.setText(avatarLetter(callerName, number));
 
                   int state = call.getDetails().getState();
                   boolean ringing = state == Call.STATE_RINGING;
@@ -782,22 +1014,32 @@ jobs:
                           || state == Call.STATE_CONNECTING;
 
                   statusView.setText(stateLabel(state));
-                  answerButton.setVisibility(ringing ? View.VISIBLE : View.GONE);
-                  rejectButton.setVisibility(ringing ? View.VISIBLE : View.GONE);
-                  muteButton.setVisibility(active && !ringing ? View.VISIBLE : View.GONE);
-                  speakerButton.setVisibility(active && !ringing ? View.VISIBLE : View.GONE);
-                  endButton.setVisibility(active ? View.VISIBLE : View.GONE);
+
+                  incomingActions.setVisibility(
+                      ringing ? View.VISIBLE : View.GONE
+                  );
+                  ongoingActions.setVisibility(
+                      active && !ringing ? View.VISIBLE : View.GONE
+                  );
+                  endButton.setVisibility(
+                      active && !ringing ? View.VISIBLE : View.GONE
+                  );
 
                   if (state == Call.STATE_ACTIVE && connectTimeMillis == 0L) {
                       connectTimeMillis = call.getDetails().getConnectTimeMillis();
                   }
 
                   muteButton.setText(
-                      PhoneInCallService.isMutedState() ? "إلغاء الكتم" : "كتم"
+                      PhoneInCallService.isMutedState()
+                          ? "إلغاء الكتم"
+                          : "كتم"
                   );
                   speakerButton.setText(
-                      PhoneInCallService.isSpeaker() ? "السماعة مفعّلة" : "السماعة"
+                      PhoneInCallService.isSpeaker()
+                          ? "السماعة مفعّلة"
+                          : "السماعة"
                   );
+
                   renderTimer();
               }
 
@@ -812,7 +1054,7 @@ jobs:
                       case Call.STATE_ACTIVE:
                           return "مكالمة جارية";
                       case Call.STATE_HOLDING:
-                          return "معلقة";
+                          return "المكالمة معلقة";
                       case Call.STATE_DISCONNECTED:
                           return "انتهت المكالمة";
                       default:
@@ -824,6 +1066,7 @@ jobs:
                   if (timerView == null) {
                       return;
                   }
+
                   if (connectTimeMillis <= 0L) {
                       timerView.setText("");
                       return;
@@ -989,7 +1232,10 @@ jobs:
           ! grep -n '\.getState()' android/app/src/main/java/com/dailer/phone/PhoneInCallService.java
           ! grep -n '\.getState()' android/app/src/main/java/com/dailer/phone/InCallActivity.java
           ! grep -n 'WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED\|WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON' android/app/src/main/java/com/dailer/phone/InCallActivity.java
-          ! grep -n 'setStatusBarColor\|setNavigationBarColor' android/app/src/main/java/com/dailer/phone/InCallActivity.java
+          grep -n 'getContactDisplayName' android/app/src/main/java/com/dailer/phone/InCallActivity.java
+          grep -n 'رفض المكالمة' android/app/src/main/java/com/dailer/phone/InCallActivity.java
+          grep -n 'الرد على المكالمة' android/app/src/main/java/com/dailer/phone/InCallActivity.java
+          ! grep -n 'root.setPadding(32, 64, 32, 40)' android/app/src/main/java/com/dailer/phone/InCallActivity.java
 
       - name: Analyze
         run: flutter analyze
