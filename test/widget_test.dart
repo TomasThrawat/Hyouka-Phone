@@ -62,8 +62,11 @@ void main() {
 
     expect(find.text('55'), findsOneWidget);
 
-    await tester.tap(find.byTooltip('مسح الرقم'));
-    await tester.pump(const Duration(milliseconds: 300));
+    final clearButton = find.byKey(const Key('clear_number_button'));
+    expect(clearButton, findsOneWidget);
+    await tester.ensureVisible(clearButton);
+    await tester.tap(clearButton, warnIfMissed: false);
+    await tester.pump();
 
     expect(find.text('55'), findsNothing);
   });
