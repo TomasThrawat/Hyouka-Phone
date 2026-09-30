@@ -12,10 +12,12 @@ class PhoneApp extends StatelessWidget {
     super.key,
     this.enableContacts = true,
     this.enableDefaultDialerPrompt = true,
+    this.initialRecents = const [],
   });
 
   final bool enableContacts;
   final bool enableDefaultDialerPrompt;
+  final List<CallEntry> initialRecents;
 
   @override
   Widget build(BuildContext context) {
@@ -41,6 +43,7 @@ class PhoneApp extends StatelessWidget {
       home: PhoneHomePage(
         enableContacts: enableContacts,
         enableDefaultDialerPrompt: enableDefaultDialerPrompt,
+        initialRecents: initialRecents,
       ),
     );
   }
@@ -73,10 +76,12 @@ class PhoneHomePage extends StatefulWidget {
     super.key,
     this.enableContacts = true,
     this.enableDefaultDialerPrompt = true,
+    this.initialRecents = const [],
   });
 
   final bool enableContacts;
   final bool enableDefaultDialerPrompt;
+  final List<CallEntry> initialRecents;
 
   @override
   State<PhoneHomePage> createState() => _PhoneHomePageState();
@@ -107,6 +112,7 @@ class _PhoneHomePageState extends State<PhoneHomePage>
   @override
   void initState() {
     super.initState();
+    _recents = List<CallEntry>.unmodifiable(widget.initialRecents);
     WidgetsBinding.instance.addObserver(this);
     if (widget.enableContacts) {
       _loadContacts();
@@ -776,6 +782,7 @@ class _PhoneHomePageState extends State<PhoneHomePage>
             itemBuilder: (context, index) {
               final entry = _recents[index];
               return InkWell(
+                key: Key('recent_call_entry_$index'),
                 onTap: () => _selectCall(
                   entry.number,
                   name: entry.name,
