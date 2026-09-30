@@ -125,45 +125,65 @@ void main() {
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
 
+    final calls = <MethodCall>[];
+    final channel = const MethodChannel('com.dailer.phone/default_dialer');
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(
-      const MethodChannel('com.dailer.phone/default_dialer'),
-      (call) async => call.method == 'placeCall' ? true : false,
-    );
+        .setMockMethodCallHandler(channel, (call) async {
+      calls.add(call);
+      return call.method == 'placeCall';
+    });
     addTearDown(
       () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(
-        const MethodChannel('com.dailer.phone/default_dialer'),
-        null,
-      ),
+          .setMockMethodCallHandler(channel, null),
     );
 
     await tester.pumpWidget(const PhoneApp(
       enableContacts: false,
       enableDefaultDialerPrompt: false,
+      initialRecents: [
+        CallEntry(
+          number: '456',
+          name: 'Test contact',
+          time: DateTime(2026, 1, 1, 12),
+        ),
+      ],
     ));
-    await tester.pump(const Duration(milliseconds: 300));
-
-    await tester.tap(find.text('4'));
-    await tester.tap(find.text('5'));
-    await tester.tap(find.text('6'));
-    await tester.tap(find.byKey(const Key('dialer_call_button')));
-    await tester.pumpAndSettle();
+    await tester.pump();
 
     await tester.tap(find.byIcon(Icons.history_outlined));
-    await tester.pumpAndSettle();
+    await tester.pump();
+
+    final recentEntry = find.byKey(const Key('recent_call_entry_0'));
+    expect(recentEntry, findsOneWidget);
     expect(find.text('456'), findsOneWidget);
 
-    await tester.tap(find.text('456'));
-    await tester.pump(const Duration(milliseconds: 200));
+    await tester.tap(recentEntry);
+    await tester.pump();
 
     expect(find.byKey(const Key('pending_call_button')), findsOneWidget);
     expect(find.byKey(const Key('pending_cancel_button')), findsOneWidget);
     expect(find.text('اتصال'), findsOneWidget);
     expect(find.text('إلغاء'), findsOneWidget);
 
+    await tester.tap(find.byKey(const Key('pending_call_button')));
+    await tester.pumpAndSettle();
+
+    expect(
+      calls.any(
+        (call) =>
+            call.method == 'placeCall' &&
+            (call.arguments as Map)['number'] == '456',
+      ),
+      isTrue,
+    );
+
+    // Select the same recent again and verify cancel clears the action card.
+    await tester.tap(recentEntry);
+    await tester.pump();
+    expect(find.byKey(const Key('pending_cancel_button')), findsOneWidget);
+
     await tester.tap(find.byKey(const Key('pending_cancel_button')));
-    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pump();
 
     expect(find.byKey(const Key('pending_call_button')), findsNothing);
     expect(find.byKey(const Key('pending_cancel_button')), findsNothing);
