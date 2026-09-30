@@ -158,17 +158,17 @@ jobs:
               '        </intent-filter>',
           ]) + '\n'
           if 'android.intent.action.DIAL' not in s:
-              s = s.replace(
-                  '        </intent-filter>\n    </activity>',
-                  '        </intent-filter>\n' + dial_filter_generic + dial_filter_tel + '    </activity>',
-                  1,
-              )
+              activity_start = s.find('    <activity')
+              activity_end = s.find('    </activity>', activity_start)
+              if activity_start < 0 or activity_end < 0:
+                  raise RuntimeError('Main activity block not found in generated manifest')
+              s = s[:activity_end] + dial_filter_generic + dial_filter_tel + s[activity_end:]
           elif 'data android:scheme="tel"' not in s:
-              s = s.replace(
-                  '        </intent-filter>\n    </activity>',
-                  '        </intent-filter>\n' + dial_filter_tel + '    </activity>',
-                  1,
-              )
+              activity_start = s.find('    <activity')
+              activity_end = s.find('    </activity>', activity_start)
+              if activity_start < 0 or activity_end < 0:
+                  raise RuntimeError('Main activity block not found in generated manifest')
+              s = s[:activity_end] + dial_filter_tel + s[activity_end:]
           if 'android:name=".PhoneInCallService"' not in s:
               service = '\n'.join([
                   '    <service',
@@ -195,10 +195,12 @@ jobs:
           grep -n 'applicationId' android/app/build.gradle.kts
           grep -n 'android:label="هاتف"' android/app/src/main/AndroidManifest.xml
           grep -n 'android:icon="@drawable/app_icon"' android/app/src/main/AndroidManifest.xml
+          test "$(grep -c 'android.intent.action.DIAL' android/app/src/main/AndroidManifest.xml)" -ge 2
           grep -n 'android.intent.action.DIAL' android/app/src/main/AndroidManifest.xml
           grep -n 'android:scheme="tel"' android/app/src/main/AndroidManifest.xml
           grep -n 'android.permission.BIND_INCALL_SERVICE' android/app/src/main/AndroidManifest.xml
           grep -n 'android.telecom.IN_CALL_SERVICE_UI' android/app/src/main/AndroidManifest.xml
+          grep -n 'android.telecom.IN_CALL_SERVICE_CAR_MODE_UI' android/app/src/main/AndroidManifest.xml
           test -s assets/icon.png
           test -s android/app/src/main/res/drawable/app_icon.png
 
