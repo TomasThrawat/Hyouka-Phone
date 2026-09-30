@@ -878,6 +878,8 @@ jobs:
               '<uses-permission android:name="android.permission.CALL_PHONE"/>',
               '<uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>',
               '<uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/>',
+              '<uses-permission android:name="android.permission.READ_PHONE_STATE"/>',
+              '<uses-permission android:name="android.permission.ANSWER_PHONE_CALLS"/>',
           ]
           for permission in permissions:
               if permission not in s:
@@ -942,6 +944,7 @@ jobs:
                   '          android:permission="android.permission.BIND_INCALL_SERVICE"',
                   '          android:exported="true">',
                   '          <meta-data android:name="android.telecom.IN_CALL_SERVICE_UI" android:value="true" />',
+                  '          <meta-data android:name="android.telecom.IN_CALL_SERVICE_CAR_MODE_UI" android:value="false" />',
                   '          <intent-filter>',
                   '              <action android:name="android.telecom.InCallService" />',
                   '          </intent-filter>',
