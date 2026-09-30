@@ -173,63 +173,74 @@ class _PhoneHomePageState extends State<PhoneHomePage> {
   }
 
   Widget _buildKeypad() {
-    return Column(
-      children: [
-        const Spacer(),
-        AnimatedSwitcher(
-          duration: const Duration(milliseconds: 180),
-          child: Text(
-            _number.isEmpty ? 'Enter number' : _number,
-            key: ValueKey(_number),
-            textAlign: TextAlign.center,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.displaySmall?.copyWith(
-              fontWeight: FontWeight.w400,
-              letterSpacing: 1.5,
-            ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxHeight < 560;
+        final keyHeight = compact ? 64.0 : 72.0;
+        final verticalGap = compact ? 9.0 : 12.0;
+        final sidePadding = compact ? 22.0 : 26.0;
+
+        return SingleChildScrollView(
+          padding: EdgeInsets.only(
+            top: compact ? 8 : 18,
+            bottom: 18,
           ),
-        ),
-        const SizedBox(height: 10),
-        IconButton(
-          tooltip: 'Delete',
-          onPressed: _number.isEmpty ? null : _delete,
-          icon: const Icon(Icons.backspace_outlined, size: 20),
-        ),
-        const SizedBox(height: 10),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 26),
-          child: GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: _keys.length,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3,
-              mainAxisExtent: 72,
-              mainAxisSpacing: 12,
-              crossAxisSpacing: 14,
-            ),
-            itemBuilder: (context, index) {
-              final key = _keys[index];
-              return _DialKey(
-                value: key.value,
-                letters: key.letters,
-                onTap: () => _append(key.value),
-              );
-            },
+          child: Column(
+            children: [
+              Text(
+                _number.isEmpty ? 'Enter number' : _number,
+                key: ValueKey(_number),
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                  fontWeight: FontWeight.w400,
+                  letterSpacing: 1.5,
+                ),
+              ),
+              SizedBox(height: compact ? 4 : 10),
+              IconButton(
+                tooltip: 'Delete',
+                onPressed: _number.isEmpty ? null : _delete,
+                icon: const Icon(Icons.backspace_outlined, size: 20),
+              ),
+              SizedBox(height: compact ? 6 : 10),
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: sidePadding),
+                child: GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: _keys.length,
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3,
+                    mainAxisExtent: keyHeight,
+                    mainAxisSpacing: verticalGap,
+                    crossAxisSpacing: 14,
+                  ),
+                  itemBuilder: (context, index) {
+                    final key = _keys[index];
+                    return _DialKey(
+                      value: key.value,
+                      letters: key.letters,
+                      onTap: () => _append(key.value),
+                    );
+                  },
+                ),
+              ),
+              SizedBox(height: compact ? 12 : 16),
+              FloatingActionButton(
+                heroTag: 'call',
+                onPressed: _call,
+                tooltip: 'Call',
+                backgroundColor:
+                    Theme.of(context).colorScheme.primary,
+                foregroundColor: Colors.black,
+                child: const Icon(Icons.call_rounded),
+              ),
+            ],
           ),
-        ),
-        const SizedBox(height: 16),
-        FloatingActionButton(
-          heroTag: 'call',
-          onPressed: _call,
-          tooltip: 'Call',
-          backgroundColor: Theme.of(context).colorScheme.primary,
-          foregroundColor: Colors.black,
-          child: const Icon(Icons.call_rounded),
-        ),
-        const SizedBox(height: 20),
-      ],
+        );
+      },
     );
   }
 
