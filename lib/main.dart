@@ -82,7 +82,8 @@ class PhoneHomePage extends StatefulWidget {
   State<PhoneHomePage> createState() => _PhoneHomePageState();
 }
 
-class _PhoneHomePageState extends State<PhoneHomePage> {
+class _PhoneHomePageState extends State<PhoneHomePage>
+    with WidgetsBindingObserver {
   static const _keys = <String>[
     '1', '2', '3',
     '4', '5', '6',
@@ -98,6 +99,7 @@ class _PhoneHomePageState extends State<PhoneHomePage> {
   List<CallEntry> _recents = const [];
   PendingCall? _pendingCall;
   bool _defaultDialerPromptShown = false;
+  bool _defaultDialerRequestInProgress = false;
 
   static const MethodChannel _defaultDialerChannel =
       MethodChannel('com.dailer.phone/default_dialer');
@@ -105,6 +107,7 @@ class _PhoneHomePageState extends State<PhoneHomePage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     if (widget.enableContacts) {
       _loadContacts();
     } else {
@@ -130,6 +133,7 @@ class _PhoneHomePageState extends State<PhoneHomePage> {
   }
 
   Future<void> _requestDefaultDialer() async {
+    _defaultDialerRequestInProgress = true;
     try {
       await _defaultDialerChannel.invokeMethod<void>(
         'requestDefaultDialer',
@@ -141,6 +145,31 @@ class _PhoneHomePageState extends State<PhoneHomePage> {
         _showMessage('تعذر فتح إعداد تطبيق الهاتف الافتراضي');
       }
     }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed &&
+        _defaultDialerRequestInProgress) {
+      _defaultDialerRequestInProgress = false;
+      _verifyDefaultDialerAfterRequest();
+    }
+  }
+
+  Future<void> _verifyDefaultDialerAfterRequest() async {
+    final isDefault = await _isDefaultDialer();
+    if (!mounted) return;
+    if (isDefault == true) {
+      _showMessage('تم تعيين هاتف كتطبيق الاتصال الافتراضي');
+    } else if (isDefault == false) {
+      _showMessage('النظام لم يعين هاتف كتطبيق الاتصال الافتراضي');
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
   }
 
   Future<void> _maybePromptForDefaultDialer() async {
