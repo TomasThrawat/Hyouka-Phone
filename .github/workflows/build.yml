@@ -23,7 +23,7 @@ jobs:
           cache: true
 
       - name: Generate Android host
-        run: flutter create --platforms=android --project-name=hyouka_phone --org=com.hyouka --no-pub .
+        run: flutter create --platforms=android --android-language java --project-name=hyouka_phone --org=com.hyouka --no-pub .
 
       - name: Resolve dependencies
         run: flutter pub get
