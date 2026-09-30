@@ -65,7 +65,12 @@ class PhoneHomePage extends StatefulWidget {
 }
 
 class _PhoneHomePageState extends State<PhoneHomePage> {
-  static const _keys = <String>['1', '2', '3', '4', '5', '6', '7', '8', '9', '*', '0', '#'];
+  static const _keys = <String>[
+    '1', '2', '3',
+    '4', '5', '6',
+    '7', '8', '9',
+    '*', '0', '#',
+  ];
 
   String _number = '';
   int _tab = 0;
@@ -162,10 +167,11 @@ class _PhoneHomePageState extends State<PhoneHomePage> {
         final digits = _digitsOnly(raw);
         if (digits.isEmpty) continue;
 
-        final matches = digits == typed || digits.endsWith(typed) || digits.contains(typed);
+        final matches =
+            digits == typed || digits.endsWith(typed) || digits.contains(typed);
         if (!matches) continue;
 
-        final key = ${contact.id.toString()}:$raw;
+        final key = '${contact.id.toString()}:$raw';
         if (seen.add(key)) {
           results.add(
             _ContactMatch(
@@ -252,7 +258,7 @@ class _PhoneHomePageState extends State<PhoneHomePage> {
     final hour = time.hour % 12 == 0 ? 12 : time.hour % 12;
     final minute = time.minute.toString().padLeft(2, '0');
     final suffix = time.hour >= 12 ? 'م' : 'ص';
-    return $hour.toString() + ':' + $minute + ' ' + $suffix;
+    return '${hour.toString()}:$minute $suffix';
   }
 
   @override
