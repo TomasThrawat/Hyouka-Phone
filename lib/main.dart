@@ -447,7 +447,8 @@ class _PhoneHomePageState extends State<PhoneHomePage> {
                   ),
                 const SizedBox(height: 10),
                 Expanded(
-                  child: Center(
+                  child: Align(
+                    alignment: Alignment.bottomCenter,
                     child: Padding(
                       padding: EdgeInsets.symmetric(
                         horizontal: compact ? 28 : 34,
@@ -514,6 +515,7 @@ class _PhoneHomePageState extends State<PhoneHomePage> {
                             width: 60,
                             height: 60,
                             child: FilledButton(
+                              key: const Key('dialer_call_button'),
                               onPressed: _number.isEmpty
                                   ? null
                                   : () => _selectCall(_number),
