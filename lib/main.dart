@@ -572,11 +572,22 @@ class _PhoneHomePageState extends State<PhoneHomePage> {
       );
     }
 
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(18, 14, 18, 24),
-      itemCount: _recents.length,
-      separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFF1B1B1B)),
-      itemBuilder: (context, index) {
+    return Column(
+      children: [
+        if (_pendingCall != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 14, 18, 0),
+            child: _buildCallActions(_pendingCall!),
+          ),
+        Expanded(
+          child: ListView.separated(
+            padding: const EdgeInsets.fromLTRB(18, 14, 18, 24),
+            itemCount: _recents.length,
+            separatorBuilder: (_, __) => const Divider(
+              height: 1,
+              color: Color(0xFF1B1B1B),
+            ),
+            itemBuilder: (context, index) {
         final entry = _recents[index];
         return InkWell(
           onTap: () => _selectCall(entry.number, name: entry.name),
@@ -630,8 +641,10 @@ class _PhoneHomePageState extends State<PhoneHomePage> {
               ],
             ),
           ),
-        );
-      },
+            );
+          },
+        ),
+      ),
     );
   }
 }
