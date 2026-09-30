@@ -148,10 +148,10 @@ void main() {
     await tester.tap(find.text('5'));
     await tester.tap(find.text('6'));
     await tester.tap(find.byKey(const Key('dialer_call_button')));
-    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
 
     await tester.tap(find.byIcon(Icons.history_outlined));
-    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pumpAndSettle();
     expect(find.text('456'), findsOneWidget);
 
     await tester.tap(find.text('456'));
