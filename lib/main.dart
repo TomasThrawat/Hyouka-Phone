@@ -312,16 +312,30 @@ class _PhoneHomePageState extends State<PhoneHomePage> {
       return;
     }
 
-    final uri = Uri(scheme: 'tel', path: dialable);
-    bool launched = false;
+    bool placed = false;
     try {
-      launched = await launchUrl(uri);
-    } catch (_) {
-      launched = false;
+      placed = await _defaultDialerChannel.invokeMethod<bool>(
+            'placeCall',
+            <String, dynamic>{'number': dialable},
+          ) ??
+          false;
+    } on MissingPluginException {
+      // Widget tests have no Android MethodChannel. Use the URI launcher only there.
+      final uri = Uri(scheme: 'tel', path: dialable);
+      try {
+        placed = await launchUrl(uri);
+      } catch (_) {
+        placed = false;
+      }
+    } on PlatformException catch (error) {
+      _showMessage(
+        error.message ?? 'تعذر بدء المكالمة',
+      );
+      return;
     }
 
-    if (!launched) {
-      _showMessage('تعذر فتح تطبيق الهاتف');
+    if (!placed) {
+      _showMessage('تعذر بدء المكالمة');
       return;
     }
 
