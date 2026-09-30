@@ -680,6 +680,7 @@ class _PhoneHomePageState extends State<PhoneHomePage> {
       ],
     );
   }
+}
 
 class _ContactMatch {
   const _ContactMatch({
