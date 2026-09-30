@@ -331,6 +331,7 @@ class _PhoneHomePageState extends State<PhoneHomePage> {
                     ),
                   ),
                   IconButton(
+                    key: const Key('clear_number_button'),
                     onPressed: _number.isEmpty ? null : _clear,
                     tooltip: 'مسح الرقم',
                     icon: const Icon(Icons.close),
