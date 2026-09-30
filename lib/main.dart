@@ -570,7 +570,11 @@ class _PhoneHomePageState extends State<PhoneHomePage> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.phone_in_talk_outlined, size: 42, color: Color(0xFF666666)),
+              Icon(
+                Icons.phone_in_talk_outlined,
+                size: 42,
+                color: Color(0xFF666666),
+              ),
               SizedBox(height: 12),
               Text(
                 'لا توجد مكالمات حديثة',
@@ -602,66 +606,80 @@ class _PhoneHomePageState extends State<PhoneHomePage> {
               color: Color(0xFF1B1B1B),
             ),
             itemBuilder: (context, index) {
-        final entry = _recents[index];
-        return InkWell(
-          onTap: () => _selectCall(entry.number, name: entry.name),
-          borderRadius: BorderRadius.circular(18),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-            child: Row(
-              children: [
-                const CircleAvatar(
-                  radius: 22,
-                  backgroundColor: Color(0xFF151515),
-                  child: Icon(Icons.call_made, color: Colors.white, size: 20),
+              final entry = _recents[index];
+              return InkWell(
+                onTap: () => _selectCall(
+                  entry.number,
+                  name: entry.name,
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                borderRadius: BorderRadius.circular(18),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 12,
+                  ),
+                  child: Row(
                     children: [
-                      if (entry.name != null && entry.name!.isNotEmpty)
-                        Text(
-                          entry.name!,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      Text(
-                        entry.number,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Color(0xFFB5B5B5),
-                          fontSize: 14,
+                      const CircleAvatar(
+                        radius: 22,
+                        backgroundColor: Color(0xFF151515),
+                        child: Icon(
+                          Icons.call_made,
+                          color: Colors.white,
+                          size: 20,
                         ),
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        _formatTime(entry.time),
-                        style: const TextStyle(
-                          color: Color(0xFF696969),
-                          fontSize: 12,
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (entry.name != null &&
+                                entry.name!.isNotEmpty)
+                              Text(
+                                entry.name!,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            Text(
+                              entry.number,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Color(0xFFB5B5B5),
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              _formatTime(entry.time),
+                              style: const TextStyle(
+                                color: Color(0xFF696969),
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
                         ),
+                      ),
+                      const Icon(
+                        Icons.chevron_right,
+                        color: Color(0xFF666666),
                       ),
                     ],
                   ),
                 ),
-                const Icon(Icons.chevron_right, color: Color(0xFF666666)),
-              ],
-            ),
+              );
+            },
           ),
-            );
-          },
         ),
-      ),
+      ],
     );
   }
-}
 
 class _ContactMatch {
   const _ContactMatch({
