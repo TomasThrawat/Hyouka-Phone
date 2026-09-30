@@ -290,17 +290,20 @@ class _PhoneHomePageState extends State<PhoneHomePage> {
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _tab,
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
         onDestinationSelected: (index) => setState(() => _tab = index),
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.dialpad_outlined),
             selectedIcon: Icon(Icons.dialpad),
-            label: 'لوحة الأرقام',
+            label: '',
+            tooltip: 'لوحة الأرقام',
           ),
           NavigationDestination(
             icon: Icon(Icons.history_outlined),
             selectedIcon: Icon(Icons.history),
-            label: 'المكالمات',
+            label: '',
+            tooltip: 'المكالمات',
           ),
         ],
       ),
@@ -311,161 +314,168 @@ class _PhoneHomePageState extends State<PhoneHomePage> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final compact = constraints.maxHeight < 690;
+        final keySize = compact ? 56.0 : 62.0;
+        final gap = compact ? 10.0 : 12.0;
 
-        return Column(
+        return Stack(
+          clipBehavior: Clip.none,
           children: [
-            const SizedBox(height: 8),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 22),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'هاتف',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 26,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 22),
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 180),
-                child: Text(
-                  _number.isEmpty ? ' ' : _number,
-                  key: ValueKey(_number),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: compact ? 30 : 34,
-                    fontWeight: FontWeight.w400,
-                    letterSpacing: 1.2,
-                  ),
-                ),
-              ),
-            ),
-            if (_loadingContacts && !_contactsLoaded)
-              const Padding(
-                padding: EdgeInsets.only(top: 10),
-                child: SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-              ),
-            if (_matches.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(18, 10, 18, 0),
-                child: _buildContactMatches(),
-              ),
-            if (_pendingCall != null)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(18, 12, 18, 0),
-                child: _buildCallActions(_pendingCall!),
-              ),
-            const SizedBox(height: 10),
-            Expanded(
-              child: LayoutBuilder(
-                builder: (context, keypadConstraints) {
-                  final rows = 4;
-                  final maxKeySize = keypadConstraints.maxWidth >= 360 ? 60.0 : 54.0;
-                  final rowGap = keypadConstraints.maxWidth >= 360 ? 10.0 : 8.0;
-                  final actionAreaHeight = 84.0;
-                  final availableForGrid =
-                      keypadConstraints.maxHeight - actionAreaHeight;
-                  final calculatedKeySize =
-                      ((availableForGrid - ((rows - 1) * rowGap)) / rows)
-                          .clamp(44.0, maxKeySize);
-                  final keySize = calculatedKeySize.toDouble();
-
-                  return Column(
-                    children: [
-                      Expanded(
-                        child: Center(
-                          child: GridView.builder(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemCount: _keys.length,
-                            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 3,
-                              mainAxisSpacing: rowGap,
-                              crossAxisSpacing: rowGap,
-                              mainAxisExtent: keySize,
-                            ),
-                            itemBuilder: (context, index) {
-                              final value = _keys[index];
-                              return _DialKey(
-                                value: value,
-                                onTap: () => _append(value),
-                                size: keySize,
-                              );
-                            },
-                          ),
-                        ),
-                      ),
-                      SizedBox(
-                        height: actionAreaHeight,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                    Tooltip(
-                      message: 'حذف',
-                      child: Semantics(
-                        button: true,
-                        label: 'حذف',
-                        child: GestureDetector(
-                          key: const Key('delete_number_button'),
-                          behavior: HitTestBehavior.opaque,
-                          onTap: _number.isEmpty ? null : _delete,
-                          onLongPress: _number.isEmpty ? null : _clear,
-                          child: const SizedBox(
-                            width: 60,
-                            height: 60,
-                            child: Center(
-                              child: Icon(
-                                Icons.backspace_outlined,
-                                size: 22,
-                              ),
-                            ),
-                          ),
-                        ),
+            Column(
+              children: [
+                const SizedBox(height: 8),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 22),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'هاتف',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 26,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
-                            const SizedBox(width: 20),
-                            SizedBox(
-                              width: 60,
-                              height: 60,
-                              child: FilledButton(
-                                onPressed: _number.isEmpty
-                                    ? null
-                                    : () => _selectCall(_number),
-                                style: FilledButton.styleFrom(
-                                  shape: const CircleBorder(),
-                                  backgroundColor: Colors.white,
-                                  foregroundColor: Colors.black,
-                                  disabledBackgroundColor:
-                                      const Color(0xFF1A1A1A),
-                                  disabledForegroundColor:
-                                      const Color(0xFF575757),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 22),
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 180),
+                    child: Text(
+                      _number.isEmpty ? ' ' : _number,
+                      key: ValueKey(_number),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: compact ? 30 : 34,
+                        fontWeight: FontWeight.w400,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                  ),
+                ),
+                if (_loadingContacts && !_contactsLoaded)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 10),
+                    child: SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ),
+                if (_pendingCall != null)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(18, 12, 18, 0),
+                    child: _buildCallActions(_pendingCall!),
+                  ),
+                const SizedBox(height: 10),
+                Expanded(
+                  child: Center(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: compact ? 28 : 34,
+                      ),
+                      child: GridView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: _keys.length,
+                        gridDelegate:
+                            SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 3,
+                          mainAxisSpacing: gap,
+                          crossAxisSpacing: gap,
+                          mainAxisExtent: keySize,
+                        ),
+                        itemBuilder: (context, index) {
+                          final value = _keys[index];
+                          return _DialKey(
+                            value: value,
+                            onTap: () => _append(value),
+                            size: keySize,
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+                SizedBox(
+                  height: 84,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 28),
+                    child: Stack(
+                      children: [
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Tooltip(
+                            message: 'حذف',
+                            child: Semantics(
+                              button: true,
+                              label: 'حذف',
+                              child: GestureDetector(
+                                key: const Key('delete_number_button'),
+                                behavior: HitTestBehavior.opaque,
+                                onTap: _number.isEmpty ? null : _delete,
+                                onLongPress:
+                                    _number.isEmpty ? null : _clear,
+                                child: const SizedBox(
+                                  width: 60,
+                                  height: 60,
+                                  child: Center(
+                                    child: Icon(
+                                      Icons.backspace_outlined,
+                                      size: 22,
+                                    ),
+                                  ),
                                 ),
-                                child: const Icon(Icons.call, size: 26),
                               ),
                             ),
-                            const SizedBox(width: 20),
-                            const SizedBox(width: 48),
-                          ],
+                          ),
                         ),
-                      ),
-                    ],
-                  );
-                },
-              ),
+                        Align(
+                          alignment: Alignment.center,
+                          child: SizedBox(
+                            width: 60,
+                            height: 60,
+                            child: FilledButton(
+                              onPressed: _number.isEmpty
+                                  ? null
+                                  : () => _selectCall(_number),
+                              style: FilledButton.styleFrom(
+                                padding: EdgeInsets.zero,
+                                shape: const CircleBorder(),
+                                backgroundColor: Colors.white,
+                                foregroundColor: Colors.black,
+                                disabledBackgroundColor:
+                                    const Color(0xFF1A1A1A),
+                                disabledForegroundColor:
+                                    const Color(0xFF575757),
+                              ),
+                              child: const Icon(
+                                Icons.call,
+                                size: 26,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
+            if (_matches.isNotEmpty)
+              Positioned(
+                top: 108,
+                left: 18,
+                right: 18,
+                child: Material(
+                  color: Colors.transparent,
+                  child: _buildContactMatches(),
+                ),
+              ),
           ],
         );
       },
