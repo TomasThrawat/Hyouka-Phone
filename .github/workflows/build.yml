@@ -54,7 +54,6 @@ jobs:
 
           public class MainActivity extends FlutterActivity {
               private static final String CHANNEL = "com.dailer.phone/default_dialer";
-              private static final int ROLE_REQUEST_CODE = 9001;
               private static final int CALL_PERMISSION_REQUEST_CODE = 9002;
 
               private MethodChannel.Result pendingCallResult;
@@ -100,16 +99,14 @@ jobs:
                       && getPackageName().equals(telecomManager.getDefaultDialerPackage());
               }
 
-              @SuppressWarnings("deprecation")
               private void requestDefaultDialer() {
                   if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                       RoleManager roleManager = getSystemService(RoleManager.class);
                       if (roleManager != null
                           && roleManager.isRoleAvailable(RoleManager.ROLE_DIALER)) {
                           try {
-                              startActivityForResult(
-                                  roleManager.createRequestRoleIntent(RoleManager.ROLE_DIALER),
-                                  ROLE_REQUEST_CODE
+                              startActivity(
+                                  roleManager.createRequestRoleIntent(RoleManager.ROLE_DIALER)
                               );
                               return;
                           } catch (Exception ignored) {
@@ -306,13 +303,6 @@ jobs:
               @Override
               public void onMuteStateChanged(boolean isMuted) {
                   muted = isMuted;
-                  broadcastUpdate();
-              }
-
-              @SuppressWarnings("deprecation")
-              @Override
-              public void onCallAudioStateChanged(android.telecom.CallAudioState audioState) {
-                  super.onCallAudioStateChanged(audioState);
                   broadcastUpdate();
               }
 
@@ -616,15 +606,7 @@ jobs:
                   super.onCreate(savedInstanceState);
 
                   Window window = getWindow();
-                  if (Build.VERSION.SDK_INT >= 27) {
-                      setShowWhenLocked(true);
-                      setTurnScreenOn(true);
-                  } else {
-                      window.addFlags(
-                          WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
-                              | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
-                      );
-                  }
+                  configureLockScreen(this, window);
                   window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
                   window.setStatusBarColor(Color.BLACK);
                   window.setNavigationBarColor(Color.BLACK);
@@ -633,6 +615,25 @@ jobs:
                   registerCallReceiver();
                   render();
                   handler.post(timerTick);
+              }
+
+              private static void configureLockScreen(Activity activity, Window window) {
+                  if (Build.VERSION.SDK_INT >= 27) {
+                      activity.setShowWhenLocked(true);
+                      activity.setTurnScreenOn(true);
+                      return;
+                  }
+                  try {
+                      java.lang.reflect.Field showWhenLocked =
+                          WindowManager.LayoutParams.class.getField("FLAG_SHOW_WHEN_LOCKED");
+                      java.lang.reflect.Field turnScreenOn =
+                          WindowManager.LayoutParams.class.getField("FLAG_TURN_SCREEN_ON");
+                      int flags =
+                          showWhenLocked.getInt(null) | turnScreenOn.getInt(null);
+                      window.addFlags(flags);
+                  } catch (Exception ignored) {
+                      // Best-effort fallback for pre-Android-8 devices.
+                  }
               }
 
               private void buildUi() {
@@ -973,6 +974,9 @@ jobs:
           grep -n 'TelecomManager' android/app/src/main/java/com/dailer/phone/MainActivity.java
           grep -n 'placeCall' android/app/src/main/java/com/dailer/phone/MainActivity.java
           ! grep -n 'window.setShowWhenLocked\|window.setTurnScreenOn' android/app/src/main/java/com/dailer/phone/InCallActivity.java
+          ! grep -n 'startActivityForResult' android/app/src/main/java/com/dailer/phone/MainActivity.java
+          ! grep -n 'onCallAudioStateChanged' android/app/src/main/java/com/dailer/phone/PhoneInCallService.java
+          ! grep -n 'WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED\|WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON' android/app/src/main/java/com/dailer/phone/InCallActivity.java
 
       - name: Analyze
         run: flutter analyze
