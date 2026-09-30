@@ -890,7 +890,9 @@ jobs:
                       )
                   );
 
-                  speakerButton = makeControlButton("السماعة");
+                  speakerButton = makeControlButton("🔊");
+                  speakerButton.setTextSize(24);
+                  speakerButton.setContentDescription("تبديل وضع الصوت");
                   speakerButton.setOnClickListener(
                       v -> PhoneInCallService.toggleSpeaker()
                   );
@@ -1032,10 +1034,12 @@ jobs:
                           ? "إلغاء الكتم"
                           : "كتم"
                   );
-                  speakerButton.setText(
-                      PhoneInCallService.isSpeaker()
-                          ? "السماعة مفعّلة"
-                          : "السماعة"
+                  boolean speakerEnabled = PhoneInCallService.isSpeaker();
+                  speakerButton.setText(speakerEnabled ? "🔊" : "🎤");
+                  speakerButton.setContentDescription(
+                      speakerEnabled
+                          ? "السماعة مفعّلة، اضغط للتبديل"
+                          : "الميكروفون، اضغط للتبديل"
                   );
 
                   renderTimer();
