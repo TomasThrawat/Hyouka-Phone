@@ -41,6 +41,15 @@ jobs:
       - name: Resolve dependencies
         run: flutter pub get
 
+      - name: Verify Android identity and icon
+        shell: bash
+        run: |
+          grep -n 'applicationId' android/app/build.gradle.kts
+          grep -n 'android:label="هاتف"' android/app/src/main/AndroidManifest.xml
+          grep -n 'android:icon="@drawable/app_icon"' android/app/src/main/AndroidManifest.xml
+          test -s assets/icon.png
+          test -s android/app/src/main/res/drawable/app_icon.png
+
       - name: Analyze
         run: flutter analyze
 
@@ -51,11 +60,11 @@ jobs:
         run: flutter build apk --release --split-per-abi --target-platform android-arm64
 
       - name: Show APK sizes
-        run: ls -lh build/app/outputs/flutter-apk/release/*.apk
+        run: ls -lh build/app/outputs/flutter-apk/*.apk
 
       - name: Upload arm64 APK
         uses: actions/upload-artifact@v6
         with:
           name: هاتف-arm64-v8a-release-apk
-          path: build/app/outputs/flutter-apk/release/app-arm64-v8a-release.apk
+          path: build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
           if-no-files-found: error
