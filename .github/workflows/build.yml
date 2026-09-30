@@ -8,6 +8,10 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      GIT_CONFIG_COUNT: 1
+      GIT_CONFIG_KEY_0: advice.defaultBranchName
+      GIT_CONFIG_VALUE_0: false
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -28,6 +32,11 @@ jobs:
           cp assets/icon.png android/app/src/main/res/drawable/app_icon.png
           python3 - <<'PY'
           from pathlib import Path
+          gradle_props = Path("android/gradle.properties")
+          gradle_text = gradle_props.read_text() if gradle_props.exists() else ""
+          watch_setting = "org.gradle.vfs.watch=false"
+          if watch_setting not in gradle_text:
+              gradle_props.write_text(gradle_text.rstrip() + "\n" + watch_setting + "\n")
           p = Path("android/app/src/main/AndroidManifest.xml")
           s = p.read_text()
           if 'android.permission.READ_CONTACTS' not in s:
