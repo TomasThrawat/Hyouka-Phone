@@ -72,28 +72,100 @@ void main() {
     expect(find.text('55'), findsNothing);
   });
 
-  testWidgets('selecting a number shows call and cancel actions', (tester) async {
+  testWidgets('call button invokes Android call bridge', (tester) async {
     tester.view.physicalSize = const Size(1080, 2400);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
 
-    await tester.pumpWidget(const PhoneApp(enableContacts: false, enableDefaultDialerPrompt: false));
+    final calls = <MethodCall>[];
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+      const MethodChannel('com.dailer.phone/default_dialer'),
+      (call) async {
+        calls.add(call);
+        if (call.method == 'placeCall') return true;
+        return false;
+      },
+    );
+    addTearDown(
+      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+        const MethodChannel('com.dailer.phone/default_dialer'),
+        null,
+      ),
+    );
+
+    await tester.pumpWidget(const PhoneApp(
+      enableContacts: false,
+      enableDefaultDialerPrompt: false,
+    ));
     await tester.pump(const Duration(milliseconds: 300));
 
     await tester.tap(find.text('1'));
-    await tester.pump(const Duration(milliseconds: 100));
     await tester.tap(find.text('2'));
-    await tester.pump(const Duration(milliseconds: 100));
     await tester.tap(find.text('3'));
     await tester.pump(const Duration(milliseconds: 100));
 
-    expect(find.text('123'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('dialer_call_button')));
+    await tester.pump(const Duration(milliseconds: 300));
 
-    await tester.tap(find.byIcon(Icons.call).last);
+    expect(
+      calls.any(
+        (call) =>
+            call.method == 'placeCall' &&
+            (call.arguments as Map)['number'] == '123',
+      ),
+      isTrue,
+    );
+  });
+
+  testWidgets('selected number shows working call and cancel actions', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+      const MethodChannel('com.dailer.phone/default_dialer'),
+      (call) async => call.method == 'placeCall' ? true : false,
+    );
+    addTearDown(
+      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+        const MethodChannel('com.dailer.phone/default_dialer'),
+        null,
+      ),
+    );
+
+    await tester.pumpWidget(const PhoneApp(
+      enableContacts: false,
+      enableDefaultDialerPrompt: false,
+    ));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    await tester.tap(find.text('4'));
+    await tester.tap(find.text('5'));
+    await tester.tap(find.text('6'));
+    await tester.tap(find.byKey(const Key('dialer_call_button')));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    await tester.tap(find.byIcon(Icons.history_outlined));
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(find.text('456'), findsOneWidget);
+
+    await tester.tap(find.text('456'));
     await tester.pump(const Duration(milliseconds: 200));
 
+    expect(find.byKey(const Key('pending_call_button')), findsOneWidget);
+    expect(find.byKey(const Key('pending_cancel_button')), findsOneWidget);
     expect(find.text('اتصال'), findsOneWidget);
     expect(find.text('إلغاء'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('pending_cancel_button')));
+    await tester.pump(const Duration(milliseconds: 200));
+
+    expect(find.byKey(const Key('pending_call_button')), findsNothing);
+    expect(find.byKey(const Key('pending_cancel_button')), findsNothing);
   });
 
   testWidgets('long press on delete clears the whole number', (tester) async {
