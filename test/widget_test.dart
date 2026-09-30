@@ -11,7 +11,7 @@ void main() {
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
 
-    await tester.pumpWidget(const PhoneApp());
+    await tester.pumpWidget(const PhoneApp(enableContacts: false));
     await tester.pump(const Duration(milliseconds: 300));
 
     expect(find.text('هاتف'), findsOneWidget);
@@ -33,7 +33,7 @@ void main() {
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
 
-    await tester.pumpWidget(const PhoneApp());
+    await tester.pumpWidget(const PhoneApp(enableContacts: false));
     await tester.pump(const Duration(milliseconds: 300));
 
     await tester.tap(find.text('1'));
@@ -54,7 +54,7 @@ void main() {
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
 
-    await tester.pumpWidget(const PhoneApp());
+    await tester.pumpWidget(const PhoneApp(enableContacts: false));
     await tester.pump(const Duration(milliseconds: 300));
 
     await tester.tap(find.text('5'));
@@ -74,7 +74,7 @@ void main() {
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
 
-    await tester.pumpWidget(const PhoneApp());
+    await tester.pumpWidget(const PhoneApp(enableContacts: false));
     await tester.pump(const Duration(milliseconds: 300));
 
     await tester.tap(find.text('1'));
@@ -98,7 +98,7 @@ void main() {
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
 
-    await tester.pumpWidget(const PhoneApp());
+    await tester.pumpWidget(const PhoneApp(enableContacts: false));
     await tester.pump(const Duration(milliseconds: 300));
 
     await tester.tap(find.text('المكالمات'));
