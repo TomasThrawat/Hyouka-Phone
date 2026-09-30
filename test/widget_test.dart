@@ -137,7 +137,7 @@ void main() {
           .setMockMethodCallHandler(channel, null),
     );
 
-    await tester.pumpWidget(const PhoneApp(
+    await tester.pumpWidget(PhoneApp(
       enableContacts: false,
       enableDefaultDialerPrompt: false,
       initialRecents: [
