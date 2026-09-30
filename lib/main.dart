@@ -311,8 +311,6 @@ class _PhoneHomePageState extends State<PhoneHomePage> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final compact = constraints.maxHeight < 690;
-        final keySize = compact ? 56.0 : 62.0;
-        final gap = compact ? 10.0 : 12.0;
 
         return Column(
           children: [
