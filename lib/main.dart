@@ -7,7 +7,12 @@ void main() {
 }
 
 class PhoneApp extends StatelessWidget {
-  const PhoneApp({super.key});
+  const PhoneApp({
+    super.key,
+    this.enableContacts = true,
+  });
+
+  final bool enableContacts;
 
   @override
   Widget build(BuildContext context) {
@@ -30,7 +35,7 @@ class PhoneApp extends StatelessWidget {
           indicatorColor: Color(0xFF242424),
         ),
       ),
-      home: const PhoneHomePage(),
+      home: PhoneHomePage(enableContacts: enableContacts),
     );
   }
 }
@@ -58,7 +63,12 @@ class PendingCall {
 }
 
 class PhoneHomePage extends StatefulWidget {
-  const PhoneHomePage({super.key});
+  const PhoneHomePage({
+    super.key,
+    this.enableContacts = true,
+  });
+
+  final bool enableContacts;
 
   @override
   State<PhoneHomePage> createState() => _PhoneHomePageState();
@@ -83,7 +93,11 @@ class _PhoneHomePageState extends State<PhoneHomePage> {
   @override
   void initState() {
     super.initState();
-    _loadContacts();
+    if (widget.enableContacts) {
+      _loadContacts();
+    } else {
+      _contactsLoaded = true;
+    }
   }
 
   String _digitsOnly(String value) {
