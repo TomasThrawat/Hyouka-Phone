@@ -413,18 +413,25 @@ class _PhoneHomePageState extends State<PhoneHomePage> {
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                    GestureDetector(
-                      key: const Key('delete_number_button'),
-                      behavior: HitTestBehavior.opaque,
-                      onTap: _number.isEmpty ? null : _delete,
-                      onLongPress: _number.isEmpty ? null : _clear,
-                      child: const SizedBox(
-                        width: 60,
-                        height: 60,
-                        child: Center(
-                          child: Icon(
-                            Icons.backspace_outlined,
-                            size: 22,
+                    Tooltip(
+                      message: 'حذف',
+                      child: Semantics(
+                        button: true,
+                        label: 'حذف',
+                        child: GestureDetector(
+                          key: const Key('delete_number_button'),
+                          behavior: HitTestBehavior.opaque,
+                          onTap: _number.isEmpty ? null : _delete,
+                          onLongPress: _number.isEmpty ? null : _clear,
+                          child: const SizedBox(
+                            width: 60,
+                            height: 60,
+                            child: Center(
+                              child: Icon(
+                                Icons.backspace_outlined,
+                                size: 22,
+                              ),
+                            ),
                           ),
                         ),
                       ),
