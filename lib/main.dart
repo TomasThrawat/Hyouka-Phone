@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -10,9 +11,11 @@ class PhoneApp extends StatelessWidget {
   const PhoneApp({
     super.key,
     this.enableContacts = true,
+    this.enableDefaultDialerPrompt = true,
   });
 
   final bool enableContacts;
+  final bool enableDefaultDialerPrompt;
 
   @override
   Widget build(BuildContext context) {
@@ -35,7 +38,10 @@ class PhoneApp extends StatelessWidget {
           indicatorColor: Color(0xFF242424),
         ),
       ),
-      home: PhoneHomePage(enableContacts: enableContacts),
+      home: PhoneHomePage(
+        enableContacts: enableContacts,
+        enableDefaultDialerPrompt: enableDefaultDialerPrompt,
+      ),
     );
   }
 }
@@ -66,9 +72,11 @@ class PhoneHomePage extends StatefulWidget {
   const PhoneHomePage({
     super.key,
     this.enableContacts = true,
+    this.enableDefaultDialerPrompt = true,
   });
 
   final bool enableContacts;
+  final bool enableDefaultDialerPrompt;
 
   @override
   State<PhoneHomePage> createState() => _PhoneHomePageState();
@@ -89,6 +97,10 @@ class _PhoneHomePageState extends State<PhoneHomePage> {
   List<Contact> _contacts = const [];
   List<CallEntry> _recents = const [];
   PendingCall? _pendingCall;
+  bool _defaultDialerPromptShown = false;
+
+  static const MethodChannel _defaultDialerChannel =
+      MethodChannel('com.dailer.phone/default_dialer');
 
   @override
   void initState() {
@@ -98,6 +110,68 @@ class _PhoneHomePageState extends State<PhoneHomePage> {
     } else {
       _contactsLoaded = true;
     }
+    if (widget.enableDefaultDialerPrompt) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _maybePromptForDefaultDialer();
+      });
+    }
+  }
+
+  Future<bool?> _isDefaultDialer() async {
+    try {
+      return await _defaultDialerChannel.invokeMethod<bool>(
+        'isDefaultDialer',
+      );
+    } on MissingPluginException {
+      return null;
+    } on PlatformException {
+      return null;
+    }
+  }
+
+  Future<void> _requestDefaultDialer() async {
+    try {
+      await _defaultDialerChannel.invokeMethod<void>(
+        'requestDefaultDialer',
+      );
+    } on MissingPluginException {
+      // Native channel is unavailable in widget tests.
+    } on PlatformException {
+      if (mounted) {
+        _showMessage('تعذر فتح إعداد تطبيق الهاتف الافتراضي');
+      }
+    }
+  }
+
+  Future<void> _maybePromptForDefaultDialer() async {
+    if (_defaultDialerPromptShown || !mounted) return;
+    _defaultDialerPromptShown = true;
+
+    final isDefault = await _isDefaultDialer();
+    if (!mounted || isDefault != false) return;
+
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('تعيين هاتف كتطبيق الهاتف الافتراضي؟'),
+        content: const Text(
+          'يمكنك اختيار هاتف كتطبيق الاتصال الافتراضي من إعدادات النظام.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('لاحقًا'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _requestDefaultDialer();
+            },
+            child: const Text('تعيين كافتراضي'),
+          ),
+        ],
+      ),
+    );
   }
 
   String _digitsOnly(String value) {
