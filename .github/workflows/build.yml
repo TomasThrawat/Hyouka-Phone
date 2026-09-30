@@ -635,8 +635,6 @@ jobs:
                   Window window = getWindow();
                   configureLockScreen(this, window);
                   window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-                  window.setStatusBarColor(Color.BLACK);
-                  window.setNavigationBarColor(Color.BLACK);
 
                   buildUi();
                   registerCallReceiver();
