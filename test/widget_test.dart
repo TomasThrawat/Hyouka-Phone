@@ -128,7 +128,7 @@ void main() {
     await tester.pumpWidget(const PhoneApp(enableContacts: false, enableDefaultDialerPrompt: false));
     await tester.pump(const Duration(milliseconds: 300));
 
-    await tester.tap(find.text('المكالمات'));
+    await tester.tap(find.byIcon(Icons.history_outlined));
     await tester.pump(const Duration(milliseconds: 300));
 
     expect(find.text('لا توجد مكالمات حديثة'), findsOneWidget);
