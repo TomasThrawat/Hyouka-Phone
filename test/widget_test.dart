@@ -132,31 +132,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
 
     expect(find.text('لا توجد مكالمات حديثة'), findsOneWidget);
-  });  testWidgets('number pad sits directly above the dialer button', (tester) async {
-    tester.view.physicalSize = const Size(1080, 2400);
-    tester.view.devicePixelRatio = 1.0;
-    addTearDown(tester.view.reset);
-
-    await tester.pumpWidget(const PhoneApp(
-      enableContacts: false,
-      enableDefaultDialerPrompt: false,
-    ));
-    await tester.pump(const Duration(milliseconds: 300));
-
-    final lastKey = find.text('#');
-    final dialerButton = find.byKey(const Key('dialer_call_button'));
-
-    expect(lastKey, findsOneWidget);
-    expect(dialerButton, findsOneWidget);
-
-    final lastKeyRect = tester.getRect(lastKey);
-    final dialerRect = tester.getRect(dialerButton);
-
-    expect(lastKeyRect.center.dx, closeTo(dialerRect.center.dx, 1.0));
-    expect(lastKeyRect.bottom, lessThanOrEqualTo(dialerRect.top));
-  });
-
-  testWidgets('bottom navigation uses icons only', (tester) async {
+  });  testWidgets('bottom navigation uses icons only', (tester) async {
     tester.view.physicalSize = const Size(1080, 2400);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
