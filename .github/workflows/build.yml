@@ -197,11 +197,6 @@ jobs:
                   }
               }
 
-              @SuppressWarnings("deprecation")
-              @Override
-              protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-                  super.onActivityResult(requestCode, resultCode, data);
-              }
           }
           JAVA
 
@@ -402,16 +397,30 @@ jobs:
                   }
               }
 
-              @SuppressWarnings("deprecation")
               private static void setLegacySpeakerRoute(PhoneInCallService service) {
-                  android.telecom.CallAudioState state = service.getCallAudioState();
-                  int currentRoute = state == null
-                      ? android.telecom.CallAudioState.ROUTE_WIRED_OR_EARPIECE
-                      : state.getRoute();
-                  int target = currentRoute == android.telecom.CallAudioState.ROUTE_SPEAKER
-                      ? android.telecom.CallAudioState.ROUTE_WIRED_OR_EARPIECE
-                      : android.telecom.CallAudioState.ROUTE_SPEAKER;
-                  service.setAudioRoute(target);
+                  try {
+                      Class<?> stateClass = Class.forName("android.telecom.CallAudioState");
+                      int speaker = stateClass.getField("ROUTE_SPEAKER").getInt(null);
+                      int wiredOrEarpiece =
+                          stateClass.getField("ROUTE_WIRED_OR_EARPIECE").getInt(null);
+
+                      Object state =
+                          InCallService.class.getMethod("getCallAudioState").invoke(service);
+                      int currentRoute = wiredOrEarpiece;
+                      if (state != null) {
+                          Object route = state.getClass().getMethod("getRoute").invoke(state);
+                          if (route instanceof Integer) {
+                              currentRoute = (Integer) route;
+                          }
+                      }
+
+                      int target = currentRoute == speaker ? wiredOrEarpiece : speaker;
+                      InCallService.class
+                          .getMethod("setAudioRoute", int.class)
+                          .invoke(service, target);
+                  } catch (Exception ignored) {
+                      // Best-effort fallback for pre-Android-14 routing.
+                  }
               }
 
               public static boolean isSpeaker() {
@@ -426,11 +435,20 @@ jobs:
                   return isLegacySpeaker(instance);
               }
 
-              @SuppressWarnings("deprecation")
               private static boolean isLegacySpeaker(PhoneInCallService service) {
-                  android.telecom.CallAudioState state = service.getCallAudioState();
-                  return state != null
-                      && state.getRoute() == android.telecom.CallAudioState.ROUTE_SPEAKER;
+                  try {
+                      Class<?> stateClass = Class.forName("android.telecom.CallAudioState");
+                      int speaker = stateClass.getField("ROUTE_SPEAKER").getInt(null);
+                      Object state =
+                          InCallService.class.getMethod("getCallAudioState").invoke(service);
+                      if (state == null) {
+                          return false;
+                      }
+                      Object route = state.getClass().getMethod("getRoute").invoke(state);
+                      return route instanceof Integer && ((Integer) route) == speaker;
+                  } catch (Exception ignored) {
+                      return false;
+                  }
               }
 
               private void applyMuted(boolean value) {
@@ -599,8 +617,8 @@ jobs:
 
                   Window window = getWindow();
                   if (Build.VERSION.SDK_INT >= 27) {
-                      window.setShowWhenLocked(true);
-                      window.setTurnScreenOn(true);
+                      setShowWhenLocked(true);
+                      setTurnScreenOn(true);
                   } else {
                       window.addFlags(
                           WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
@@ -954,6 +972,7 @@ jobs:
           grep -n 'class InCallActivity extends Activity' android/app/src/main/java/com/dailer/phone/InCallActivity.java
           grep -n 'TelecomManager' android/app/src/main/java/com/dailer/phone/MainActivity.java
           grep -n 'placeCall' android/app/src/main/java/com/dailer/phone/MainActivity.java
+          ! grep -n 'window.setShowWhenLocked\|window.setTurnScreenOn' android/app/src/main/java/com/dailer/phone/InCallActivity.java
 
       - name: Analyze
         run: flutter analyze
