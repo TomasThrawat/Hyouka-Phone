@@ -328,9 +328,11 @@ class _PhoneHomePageState extends State<PhoneHomePage>
   }
 
   void _selectCall(String number, {String? name}) {
+    final dialable = _dialableNumber(number);
+    if (dialable.isEmpty) return;
     setState(() {
       _number = number;
-      _pendingCall = PendingCall(number: number, name: name);
+      _pendingCall = PendingCall(number: dialable, name: name);
     });
   }
 
@@ -485,10 +487,15 @@ class _PhoneHomePageState extends State<PhoneHomePage>
                   ),
                 if (_pendingCall != null)
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(18, 12, 18, 0),
+                    padding: const EdgeInsets.fromLTRB(18, 10, 18, 0),
                     child: _buildCallActions(_pendingCall!),
                   ),
-                const SizedBox(height: 10),
+                if (_pendingCall == null && _matches.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(18, 8, 18, 0),
+                    child: _buildContactMatches(),
+                  ),
+                const SizedBox(height: 8),
                 Expanded(
                   child: Align(
                     alignment: Alignment.bottomCenter,
@@ -561,7 +568,7 @@ class _PhoneHomePageState extends State<PhoneHomePage>
                               key: const Key('dialer_call_button'),
                               onPressed: _number.isEmpty
                                   ? null
-                                  : () => _selectCall(_number),
+                                  : () => _placeCall(_number),
                               style: FilledButton.styleFrom(
                                 padding: EdgeInsets.zero,
                                 shape: const CircleBorder(),
@@ -585,16 +592,6 @@ class _PhoneHomePageState extends State<PhoneHomePage>
                 ),
               ],
             ),
-            if (_matches.isNotEmpty)
-              Positioned(
-                top: 108,
-                left: 18,
-                right: 18,
-                child: Material(
-                  color: Colors.transparent,
-                  child: _buildContactMatches(),
-                ),
-              ),
           ],
         );
       },
@@ -672,9 +669,11 @@ class _PhoneHomePageState extends State<PhoneHomePage>
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: const Color(0xFF222222)),
       ),
-      child: Row(
-        children: [
-          Expanded(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 58),
+        child: Row(
+          children: [
+            Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -702,6 +701,7 @@ class _PhoneHomePageState extends State<PhoneHomePage>
             ),
           ),
           FilledButton.tonalIcon(
+            key: const Key('pending_call_button'),
             onPressed: () => _placeCall(pending.number, name: pending.name),
             icon: const Icon(Icons.call, size: 18),
             label: const Text('اتصال'),
@@ -711,13 +711,21 @@ class _PhoneHomePageState extends State<PhoneHomePage>
             ),
           ),
           const SizedBox(width: 8),
-          TextButton.icon(
-            onPressed: () => setState(() => _pendingCall = null),
-            icon: const Icon(Icons.close, size: 18),
-            label: const Text('إلغاء'),
-            style: TextButton.styleFrom(foregroundColor: const Color(0xFFB0B0B0)),
-          ),
-        ],
+            TextButton.icon(
+              key: const Key('pending_cancel_button'),
+              onPressed: () {
+                FocusManager.instance.primaryFocus?.unfocus();
+                setState(() => _pendingCall = null);
+              },
+              icon: const Icon(Icons.close, size: 18),
+              label: const Text('إلغاء'),
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFFB0B0B0),
+                minimumSize: const Size(90, 48),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
