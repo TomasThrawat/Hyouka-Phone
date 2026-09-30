@@ -316,30 +316,22 @@ class _PhoneHomePageState extends State<PhoneHomePage> {
 
         return Column(
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(22, 8, 22, 0),
-              child: Row(
-                children: [
-                  const Expanded(
-                    child: Text(
-                      'هاتف',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 26,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
+            const SizedBox(height: 8),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 22),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'هاتف',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 26,
+                    fontWeight: FontWeight.w700,
                   ),
-                  IconButton(
-                    key: const Key('clear_number_button'),
-                    onPressed: _number.isEmpty ? null : _clear,
-                    tooltip: 'مسح الرقم',
-                    icon: const Icon(Icons.close),
-                  ),
-                ],
+                ),
               ),
             ),
-            const Spacer(),
+            const SizedBox(height: 16),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 22),
               child: AnimatedSwitcher(
@@ -378,62 +370,91 @@ class _PhoneHomePageState extends State<PhoneHomePage> {
                 padding: const EdgeInsets.fromLTRB(18, 12, 18, 0),
                 child: _buildCallActions(_pendingCall!),
               ),
-            const SizedBox(height: 18),
-            Flexible(
-              child: Center(
-                child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: compact ? 28 : 34),
-                  child: GridView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: _keys.length,
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 3,
-                      mainAxisSpacing: gap,
-                      crossAxisSpacing: gap,
-                      mainAxisExtent: keySize,
-                    ),
-                    itemBuilder: (context, index) {
-                      final value = _keys[index];
-                      return _DialKey(
-                        value: value,
-                        onTap: () => _append(value),
-                        size: keySize,
-                      );
-                    },
-                  ),
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(28, 10, 28, 18),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  IconButton(
-                    onPressed: _number.isEmpty ? null : _delete,
-                    tooltip: 'حذف',
-                    icon: const Icon(Icons.backspace_outlined, size: 22),
-                  ),
-                  const SizedBox(width: 20),
-                  SizedBox(
-                    width: 60,
-                    height: 60,
-                    child: FilledButton(
-                      onPressed: _number.isEmpty ? null : () => _selectCall(_number),
-                      style: FilledButton.styleFrom(
-                        shape: const CircleBorder(),
-                        backgroundColor: Colors.white,
-                        foregroundColor: Colors.black,
-                        disabledBackgroundColor: const Color(0xFF1A1A1A),
-                        disabledForegroundColor: const Color(0xFF575757),
+            const SizedBox(height: 10),
+            Expanded(
+              child: LayoutBuilder(
+                builder: (context, keypadConstraints) {
+                  final rows = 4;
+                  final maxKeySize = keypadConstraints.maxWidth >= 360 ? 60.0 : 54.0;
+                  final rowGap = keypadConstraints.maxWidth >= 360 ? 10.0 : 8.0;
+                  final actionAreaHeight = 84.0;
+                  final availableForGrid =
+                      keypadConstraints.maxHeight - actionAreaHeight;
+                  final calculatedKeySize =
+                      ((availableForGrid - ((rows - 1) * rowGap)) / rows)
+                          .clamp(44.0, maxKeySize);
+                  final keySize = calculatedKeySize.toDouble();
+
+                  return Column(
+                    children: [
+                      Expanded(
+                        child: Center(
+                          child: GridView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: _keys.length,
+                            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 3,
+                              mainAxisSpacing: rowGap,
+                              crossAxisSpacing: rowGap,
+                              mainAxisExtent: keySize,
+                            ),
+                            itemBuilder: (context, index) {
+                              final value = _keys[index];
+                              return _DialKey(
+                                value: value,
+                                onTap: () => _append(value),
+                                size: keySize,
+                              );
+                            },
+                          ),
+                        ),
                       ),
-                      child: const Icon(Icons.call, size: 26),
-                    ),
-                  ),
-                  const SizedBox(width: 20),
-                  const SizedBox(width: 48),
-                ],
+                      SizedBox(
+                        height: actionAreaHeight,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            GestureDetector(
+                              onLongPress: _number.isEmpty ? null : _clear,
+                              child: IconButton(
+                                key: const Key('delete_number_button'),
+                                onPressed: _number.isEmpty ? null : _delete,
+                                tooltip: 'حذف',
+                                icon: const Icon(
+                                  Icons.backspace_outlined,
+                                  size: 22,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 20),
+                            SizedBox(
+                              width: 60,
+                              height: 60,
+                              child: FilledButton(
+                                onPressed: _number.isEmpty
+                                    ? null
+                                    : () => _selectCall(_number),
+                                style: FilledButton.styleFrom(
+                                  shape: const CircleBorder(),
+                                  backgroundColor: Colors.white,
+                                  foregroundColor: Colors.black,
+                                  disabledBackgroundColor:
+                                      const Color(0xFF1A1A1A),
+                                  disabledForegroundColor:
+                                      const Color(0xFF575757),
+                                ),
+                                child: const Icon(Icons.call, size: 26),
+                              ),
+                            ),
+                            const SizedBox(width: 20),
+                            const SizedBox(width: 48),
+                          ],
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
             ),
           ],
@@ -444,7 +465,7 @@ class _PhoneHomePageState extends State<PhoneHomePage> {
 
   Widget _buildContactMatches() {
     return Container(
-      constraints: const BoxConstraints(maxHeight: 190),
+      constraints: const BoxConstraints(maxHeight: 96),
       decoration: BoxDecoration(
         color: const Color(0xFF101010),
         borderRadius: BorderRadius.circular(20),
