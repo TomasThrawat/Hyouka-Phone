@@ -95,6 +95,30 @@ void main() {
     expect(find.text('إلغاء'), findsOneWidget);
   });
 
+  testWidgets('long press on delete clears the whole number', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(const PhoneApp(enableContacts: false));
+    await tester.pump();
+
+    await tester.tap(find.text('7'));
+    await tester.tap(find.text('8'));
+    await tester.tap(find.text('9'));
+    await tester.pump();
+
+    expect(find.text('789'), findsOneWidget);
+
+    final deleteButton = find.byKey(const Key('delete_number_button'));
+    expect(deleteButton, findsOneWidget);
+    await tester.ensureVisible(deleteButton);
+    await tester.longPress(deleteButton);
+    await tester.pump();
+
+    expect(find.text('789'), findsNothing);
+  });
+
   testWidgets('recents tab starts empty', (tester) async {
     tester.view.physicalSize = const Size(1080, 2400);
     tester.view.devicePixelRatio = 1.0;
