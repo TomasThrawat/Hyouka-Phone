@@ -31,81 +31,100 @@ jobs:
           mkdir -p android/app/src/main/res/drawable
           cp assets/icon.png android/app/src/main/res/drawable/app_icon.png
           mkdir -p android/app/src/main/java/com/dailer/phone
+
           cat > android/app/src/main/java/com/dailer/phone/MainActivity.java <<'JAVA'
           package com.dailer.phone;
-          
+
+          import android.Manifest;
           import android.app.role.RoleManager;
           import android.content.Intent;
+          import android.content.pm.PackageManager;
+          import android.net.Uri;
           import android.os.Build;
+          import android.os.Bundle;
           import android.provider.Settings;
           import android.telecom.TelecomManager;
-          
+
           import androidx.annotation.NonNull;
-          
+
           import io.flutter.embedding.android.FlutterActivity;
           import io.flutter.embedding.engine.FlutterEngine;
           import io.flutter.plugin.common.MethodCall;
           import io.flutter.plugin.common.MethodChannel;
-          
+
           public class MainActivity extends FlutterActivity {
               private static final String CHANNEL = "com.dailer.phone/default_dialer";
-          
+              private static final int ROLE_REQUEST_CODE = 9001;
+              private static final int CALL_PERMISSION_REQUEST_CODE = 9002;
+
+              private MethodChannel.Result pendingCallResult;
+              private String pendingNumber;
+
               @Override
               public void configureFlutterEngine(@NonNull FlutterEngine flutterEngine) {
                   super.configureFlutterEngine(flutterEngine);
                   new MethodChannel(
-                flutterEngine.getDartExecutor().getBinaryMessenger(),
-                CHANNEL
+                      flutterEngine.getDartExecutor().getBinaryMessenger(),
+                      CHANNEL
                   ).setMethodCallHandler(this::handleMethodCall);
               }
-          
+
               private void handleMethodCall(MethodCall call, MethodChannel.Result result) {
                   if ("isDefaultDialer".equals(call.method)) {
-            result.success(isDefaultDialer());
+                      result.success(isDefaultDialer());
                   } else if ("requestDefaultDialer".equals(call.method)) {
-            requestDefaultDialer();
-            result.success(null);
+                      requestDefaultDialer();
+                      result.success(null);
+                  } else if ("placeCall".equals(call.method)) {
+                      String number = call.argument("number");
+                      if (number == null || number.trim().isEmpty()) {
+                          result.error("INVALID_NUMBER", "Number is empty", null);
+                          return;
+                      }
+                      placeCall(number.trim(), result);
                   } else {
-            result.notImplemented();
+                      result.notImplemented();
                   }
               }
-          
+
               private boolean isDefaultDialer() {
                   if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            RoleManager roleManager = getSystemService(RoleManager.class);
-            return roleManager != null
-                    && roleManager.isRoleAvailable(RoleManager.ROLE_DIALER)
-                    && roleManager.isRoleHeld(RoleManager.ROLE_DIALER);
+                      RoleManager roleManager = getSystemService(RoleManager.class);
+                      return roleManager != null
+                          && roleManager.isRoleAvailable(RoleManager.ROLE_DIALER)
+                          && roleManager.isRoleHeld(RoleManager.ROLE_DIALER);
                   }
                   TelecomManager telecomManager =
-                (TelecomManager) getSystemService(TELECOM_SERVICE);
+                      (TelecomManager) getSystemService(TELECOM_SERVICE);
                   return telecomManager != null
-                && getPackageName().equals(telecomManager.getDefaultDialerPackage());
+                      && getPackageName().equals(telecomManager.getDefaultDialerPackage());
               }
-          
+
+              @SuppressWarnings("deprecation")
               private void requestDefaultDialer() {
                   if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            RoleManager roleManager = getSystemService(RoleManager.class);
-            if (roleManager != null
-                    && roleManager.isRoleAvailable(RoleManager.ROLE_DIALER)) {
-                try {
-                    startActivityForResult(
-                            roleManager.createRequestRoleIntent(RoleManager.ROLE_DIALER),
-                            9001
-                    );
-                    return;
-                } catch (Exception ignored) {
-                    // Fall through to system Default apps settings.
-                }
-            }
-            openDefaultAppsSettings();
-            return;
+                      RoleManager roleManager = getSystemService(RoleManager.class);
+                      if (roleManager != null
+                          && roleManager.isRoleAvailable(RoleManager.ROLE_DIALER)) {
+                          try {
+                              startActivityForResult(
+                                  roleManager.createRequestRoleIntent(RoleManager.ROLE_DIALER),
+                                  ROLE_REQUEST_CODE
+                              );
+                              return;
+                          } catch (Exception ignored) {
+                              // Fall through to the system Default apps screen.
+                          }
+                      }
+                      openDefaultAppsSettings();
+                      return;
                   }
+
                   try {
                       Intent intent = new Intent(TelecomManager.ACTION_CHANGE_DEFAULT_DIALER);
                       intent.putExtra(
-                    TelecomManager.EXTRA_CHANGE_DEFAULT_DIALER_PACKAGE_NAME,
-                    getPackageName()
+                          TelecomManager.EXTRA_CHANGE_DEFAULT_DIALER_PACKAGE_NAME,
+                          getPackageName()
                       );
                       startActivity(intent);
                   } catch (Exception ignored) {
@@ -120,89 +139,821 @@ jobs:
                       startActivity(new Intent(Settings.ACTION_SETTINGS));
                   }
               }
+
+              private void placeCall(String number, MethodChannel.Result result) {
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+                      && checkSelfPermission(Manifest.permission.CALL_PHONE)
+                          != PackageManager.PERMISSION_GRANTED) {
+                      pendingCallResult = result;
+                      pendingNumber = number;
+                      requestPermissions(
+                          new String[]{Manifest.permission.CALL_PHONE},
+                          CALL_PERMISSION_REQUEST_CODE
+                      );
+                      return;
+                  }
+
+                  try {
+                      TelecomManager telecomManager =
+                          (TelecomManager) getSystemService(TELECOM_SERVICE);
+                      if (telecomManager == null) {
+                          result.error("NO_TELECOM", "Telecom service unavailable", null);
+                          return;
+                      }
+                      telecomManager.placeCall(
+                          Uri.fromParts("tel", number, null),
+                          new Bundle()
+                      );
+                      result.success(true);
+                  } catch (SecurityException e) {
+                      result.error("CALL_PERMISSION", "CALL_PHONE permission is required", null);
+                  } catch (Exception e) {
+                      result.error("CALL_FAILED", e.getMessage(), null);
+                  }
+              }
+
+              @Override
+              public void onRequestPermissionsResult(
+                  int requestCode,
+                  @NonNull String[] permissions,
+                  @NonNull int[] grantResults
+              ) {
+                  super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+                  if (requestCode != CALL_PERMISSION_REQUEST_CODE || pendingCallResult == null) {
+                      return;
+                  }
+
+                  MethodChannel.Result result = pendingCallResult;
+                  String number = pendingNumber;
+                  pendingCallResult = null;
+                  pendingNumber = null;
+
+                  if (grantResults.length > 0
+                      && grantResults[0] == PackageManager.PERMISSION_GRANTED
+                      && number != null) {
+                      placeCall(number, result);
+                  } else {
+                      result.error("CALL_PERMISSION", "CALL_PHONE permission was denied", null);
+                  }
+              }
+
+              @SuppressWarnings("deprecation")
+              @Override
+              protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+                  super.onActivityResult(requestCode, resultCode, data);
+              }
           }
           JAVA
+
           cat > android/app/src/main/java/com/dailer/phone/PhoneInCallService.java <<'JAVA'
           package com.dailer.phone;
-          
+
+          import android.app.Notification;
+          import android.app.NotificationChannel;
+          import android.app.NotificationManager;
+          import android.app.PendingIntent;
+          import android.content.Context;
+          import android.content.Intent;
+          import android.os.Build;
+          import android.telecom.Call;
+          import android.telecom.CallEndpoint;
+          import android.telecom.CallEndpointException;
           import android.telecom.InCallService;
-          
+          import android.telecom.VideoProfile;
+
+          import java.util.ArrayList;
+          import java.util.List;
+
           public class PhoneInCallService extends InCallService {
+              public static final String ACTION_CALL_UPDATED = "com.dailer.phone.CALL_UPDATED";
+              public static final String ACTION_CALL_FINISHED = "com.dailer.phone.CALL_FINISHED";
+              private static final int NOTIFICATION_ID = 6466;
+              private static final String CHANNEL_ID = "phone_calls";
+
+              private static PhoneInCallService instance;
+              private static Call currentCall;
+              private static boolean muted;
+              private static final List<CallEndpoint> availableEndpoints = new ArrayList<>();
+
+              private final Call.Callback callCallback = new Call.Callback() {
+                  @Override
+                  public void onStateChanged(Call call, int state) {
+                      broadcastUpdate();
+                      if (state == Call.STATE_DISCONNECTED) {
+                          finishCallUi();
+                      } else {
+                          refreshNotification();
+                      }
+                  }
+              };
+
+              public static Call getCurrentCall() {
+                  return currentCall;
+              }
+
+              public static boolean isMutedState() {
+                  return muted;
+              }
+
+              @Override
+              public void onCreate() {
+                  super.onCreate();
+                  instance = this;
+                  createNotificationChannel();
+              }
+
+              @Override
+              public void onCallAdded(Call call) {
+                  super.onCallAdded(call);
+                  currentCall = call;
+                  call.registerCallback(callCallback);
+                  muted = false;
+                  showCallUi();
+                  refreshNotification();
+              }
+
+              @Override
+              public void onCallRemoved(Call call) {
+                  try {
+                      call.unregisterCallback(callCallback);
+                  } catch (Exception ignored) {
+                  }
+                  if (call == currentCall) {
+                      currentCall = null;
+                  }
+                  cancelNotification();
+                  sendBroadcast(new Intent(ACTION_CALL_FINISHED).setPackage(getPackageName()));
+                  super.onCallRemoved(call);
+              }
+
+              @Override
+              public void onBringToForeground(boolean showDialpad) {
+                  super.onBringToForeground(showDialpad);
+                  if (currentCall != null) {
+                      showCallUi();
+                  }
+              }
+
+              @Override
+              public void onAvailableCallEndpointsChanged(List<CallEndpoint> endpoints) {
+                  synchronized (availableEndpoints) {
+                      availableEndpoints.clear();
+                      availableEndpoints.addAll(endpoints);
+                  }
+                  broadcastUpdate();
+              }
+
+              @Override
+              public void onCallEndpointChanged(CallEndpoint endpoint) {
+                  broadcastUpdate();
+              }
+
+              @Override
+              public void onMuteStateChanged(boolean isMuted) {
+                  muted = isMuted;
+                  broadcastUpdate();
+              }
+
+              @SuppressWarnings("deprecation")
+              @Override
+              public void onCallAudioStateChanged(android.telecom.CallAudioState audioState) {
+                  super.onCallAudioStateChanged(audioState);
+                  broadcastUpdate();
+              }
+
+              @Override
+              public void onSilenceRinger() {
+                  cancelNotification();
+              }
+
+              private void showCallUi() {
+                  if (currentCall == null) {
+                      return;
+                  }
+                  Intent intent = new Intent(this, InCallActivity.class);
+                  intent.addFlags(
+                      Intent.FLAG_ACTIVITY_NEW_TASK
+                          | Intent.FLAG_ACTIVITY_CLEAR_TOP
+                          | Intent.FLAG_ACTIVITY_SINGLE_TOP
+                  );
+                  startActivity(intent);
+              }
+
+              public static void answer() {
+                  if (currentCall != null && currentCall.getState() == Call.STATE_RINGING) {
+                      currentCall.answer(VideoProfile.STATE_AUDIO_ONLY);
+                  }
+              }
+
+              public static void reject() {
+                  if (currentCall != null && currentCall.getState() == Call.STATE_RINGING) {
+                      currentCall.reject(false, null);
+                  }
+              }
+
+              public static void disconnect() {
+                  if (currentCall != null) {
+                      currentCall.disconnect();
+                  }
+              }
+
+              public static void setMutedState(boolean value) {
+                  if (instance != null) {
+                      instance.applyMuted(value);
+                  }
+              }
+
+              public static void toggleSpeaker() {
+                  if (instance == null || currentCall == null) {
+                      return;
+                  }
+
+                  if (Build.VERSION.SDK_INT >= 34) {
+                      CallEndpoint current = instance.getCurrentCallEndpoint();
+                      boolean speaker =
+                          current != null && current.getEndpointType() == CallEndpoint.TYPE_SPEAKER;
+                      int desiredType =
+                          speaker ? CallEndpoint.TYPE_EARPIECE : CallEndpoint.TYPE_SPEAKER;
+
+                      synchronized (availableEndpoints) {
+                          for (CallEndpoint endpoint : availableEndpoints) {
+                              if (endpoint.getEndpointType() == desiredType) {
+                                  instance.requestCallEndpointChange(
+                                      endpoint,
+                                      instance.getMainExecutor(),
+                                      new android.os.OutcomeReceiver<Void, CallEndpointException>() {
+                                          @Override
+                                          public void onResult(Void result) {
+                                              instance.broadcastUpdate();
+                                          }
+
+                                          @Override
+                                          public void onError(CallEndpointException error) {
+                                              instance.broadcastUpdate();
+                                          }
+                                      }
+                                  );
+                                  return;
+                              }
+                          }
+                      }
+                  } else {
+                      setLegacySpeakerRoute(instance);
+                  }
+              }
+
+              @SuppressWarnings("deprecation")
+              private static void setLegacySpeakerRoute(PhoneInCallService service) {
+                  android.telecom.CallAudioState state = service.getCallAudioState();
+                  int currentRoute = state == null
+                      ? android.telecom.CallAudioState.ROUTE_WIRED_OR_EARPIECE
+                      : state.getRoute();
+                  int target = currentRoute == android.telecom.CallAudioState.ROUTE_SPEAKER
+                      ? android.telecom.CallAudioState.ROUTE_WIRED_OR_EARPIECE
+                      : android.telecom.CallAudioState.ROUTE_SPEAKER;
+                  service.setAudioRoute(target);
+              }
+
+              public static boolean isSpeaker() {
+                  if (instance == null) {
+                      return false;
+                  }
+                  if (Build.VERSION.SDK_INT >= 34) {
+                      CallEndpoint endpoint = instance.getCurrentCallEndpoint();
+                      return endpoint != null
+                          && endpoint.getEndpointType() == CallEndpoint.TYPE_SPEAKER;
+                  }
+                  return isLegacySpeaker(instance);
+              }
+
+              @SuppressWarnings("deprecation")
+              private static boolean isLegacySpeaker(PhoneInCallService service) {
+                  android.telecom.CallAudioState state = service.getCallAudioState();
+                  return state != null
+                      && state.getRoute() == android.telecom.CallAudioState.ROUTE_SPEAKER;
+              }
+
+              private void applyMuted(boolean value) {
+                  muted = value;
+                  super.setMuted(value);
+                  broadcastUpdate();
+              }
+
+              private void broadcastUpdate() {
+                  sendBroadcast(new Intent(ACTION_CALL_UPDATED).setPackage(getPackageName()));
+              }
+
+              private void finishCallUi() {
+                  cancelNotification();
+                  sendBroadcast(new Intent(ACTION_CALL_FINISHED).setPackage(getPackageName()));
+              }
+
+              private void createNotificationChannel() {
+                  if (Build.VERSION.SDK_INT < 26) {
+                      return;
+                  }
+                  NotificationChannel channel = new NotificationChannel(
+                      CHANNEL_ID,
+                      "مكالمات الهاتف",
+                      NotificationManager.IMPORTANCE_HIGH
+                  );
+                  channel.setDescription("إشعارات المكالمات الواردة والجارية");
+                  NotificationManager manager =
+                      (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+                  if (manager != null) {
+                      manager.createNotificationChannel(channel);
+                  }
+              }
+
+              private void refreshNotification() {
+                  if (currentCall == null) {
+                      return;
+                  }
+
+                  int state = currentCall.getState();
+                  Intent intent = new Intent(this, InCallActivity.class);
+                  PendingIntent pendingIntent = PendingIntent.getActivity(
+                      this,
+                      NOTIFICATION_ID,
+                      intent,
+                      PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+                  );
+
+                  String title = currentCall.getDetails().getHandle() == null
+                      ? "مكالمة"
+                      : currentCall.getDetails().getHandle().getSchemeSpecificPart();
+
+                  Notification.Builder builder =
+                      Build.VERSION.SDK_INT >= 26
+                          ? new Notification.Builder(this, CHANNEL_ID)
+                          : new Notification.Builder(this);
+
+                  builder.setSmallIcon(android.R.drawable.sym_action_call)
+                      .setContentTitle(title)
+                      .setContentText(
+                          state == Call.STATE_RINGING ? "مكالمة واردة" : "مكالمة جارية"
+                      )
+                      .setCategory(Notification.CATEGORY_CALL)
+                      .setOngoing(state != Call.STATE_DISCONNECTED)
+                      .setAutoCancel(false)
+                      .setContentIntent(pendingIntent)
+                      .setFullScreenIntent(
+                          pendingIntent,
+                          state == Call.STATE_RINGING
+                      );
+
+                  NotificationManager manager =
+                      (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+                  if (manager != null) {
+                      manager.notify(NOTIFICATION_ID, builder.build());
+                  }
+              }
+
+              private void cancelNotification() {
+                  NotificationManager manager =
+                      (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+                  if (manager != null) {
+                      manager.cancel(NOTIFICATION_ID);
+                  }
+              }
+
+              @Override
+              public void onDestroy() {
+                  cancelNotification();
+                  if (currentCall != null) {
+                      try {
+                          currentCall.unregisterCallback(callCallback);
+                      } catch (Exception ignored) {
+                      }
+                  }
+                  currentCall = null;
+                  synchronized (availableEndpoints) {
+                      availableEndpoints.clear();
+                  }
+                  instance = null;
+                  super.onDestroy();
+              }
           }
           JAVA
+
+          cat > android/app/src/main/java/com/dailer/phone/InCallActivity.java <<'JAVA'
+          package com.dailer.phone;
+
+          import android.app.Activity;
+          import android.content.BroadcastReceiver;
+          import android.content.Context;
+          import android.content.Intent;
+          import android.content.IntentFilter;
+          import android.graphics.Color;
+          import android.graphics.Typeface;
+          import android.os.Build;
+          import android.os.Bundle;
+          import android.os.Handler;
+          import android.os.Looper;
+          import android.telecom.Call;
+          import android.view.Gravity;
+          import android.view.View;
+          import android.view.Window;
+          import android.view.WindowManager;
+          import android.widget.Button;
+          import android.widget.LinearLayout;
+          import android.widget.ScrollView;
+          import android.widget.TextView;
+
+          import java.util.Locale;
+
+          public class InCallActivity extends Activity {
+              private final Handler handler = new Handler(Looper.getMainLooper());
+              private TextView numberView;
+              private TextView statusView;
+              private TextView timerView;
+              private Button answerButton;
+              private Button rejectButton;
+              private Button muteButton;
+              private Button speakerButton;
+              private Button endButton;
+              private long connectTimeMillis;
+
+              private final BroadcastReceiver receiver = new BroadcastReceiver() {
+                  @Override
+                  public void onReceive(Context context, Intent intent) {
+                      if (PhoneInCallService.ACTION_CALL_FINISHED.equals(intent.getAction())) {
+                          finish();
+                      } else {
+                          render();
+                      }
+                  }
+              };
+
+              private final Runnable timerTick = new Runnable() {
+                  @Override
+                  public void run() {
+                      renderTimer();
+                      handler.postDelayed(this, 1000L);
+                  }
+              };
+
+              @Override
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+
+                  Window window = getWindow();
+                  if (Build.VERSION.SDK_INT >= 27) {
+                      window.setShowWhenLocked(true);
+                      window.setTurnScreenOn(true);
+                  } else {
+                      window.addFlags(
+                          WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
+                              | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+                      );
+                  }
+                  window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                  window.setStatusBarColor(Color.BLACK);
+                  window.setNavigationBarColor(Color.BLACK);
+
+                  buildUi();
+                  registerCallReceiver();
+                  render();
+                  handler.post(timerTick);
+              }
+
+              private void buildUi() {
+                  ScrollView scroll = new ScrollView(this);
+                  scroll.setFillViewport(true);
+
+                  LinearLayout root = new LinearLayout(this);
+                  root.setOrientation(LinearLayout.VERTICAL);
+                  root.setGravity(Gravity.CENTER_HORIZONTAL);
+                  root.setPadding(32, 64, 32, 40);
+                  root.setBackgroundColor(Color.BLACK);
+
+                  TextView app = makeText("هاتف", 18, Color.LTGRAY);
+                  root.addView(app, matchWrap());
+
+                  numberView = makeText("مكالمة", 32, Color.WHITE);
+                  numberView.setGravity(Gravity.CENTER);
+                  numberView.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+                  LinearLayout.LayoutParams numberParams = matchWrap();
+                  numberParams.topMargin = 90;
+                  root.addView(numberView, numberParams);
+
+                  statusView = makeText("", 18, Color.LTGRAY);
+                  statusView.setGravity(Gravity.CENTER);
+                  LinearLayout.LayoutParams statusParams = matchWrap();
+                  statusParams.topMargin = 14;
+                  root.addView(statusView, statusParams);
+
+                  timerView = makeText("", 18, Color.GRAY);
+                  timerView.setGravity(Gravity.CENTER);
+                  LinearLayout.LayoutParams timerParams = matchWrap();
+                  timerParams.topMargin = 8;
+                  root.addView(timerView, timerParams);
+
+                  LinearLayout incoming = new LinearLayout(this);
+                  incoming.setGravity(Gravity.CENTER);
+                  LinearLayout.LayoutParams incomingParams = matchWrap();
+                  incomingParams.topMargin = 44;
+
+                  answerButton = makeButton("رد");
+                  answerButton.setOnClickListener(v -> PhoneInCallService.answer());
+                  incoming.addView(answerButton, actionParams());
+
+                  rejectButton = makeButton("رفض");
+                  rejectButton.setOnClickListener(v -> PhoneInCallService.reject());
+                  incoming.addView(rejectButton, actionParams());
+
+                  root.addView(incoming, incomingParams);
+
+                  LinearLayout ongoing = new LinearLayout(this);
+                  ongoing.setGravity(Gravity.CENTER);
+                  LinearLayout.LayoutParams ongoingParams = matchWrap();
+                  ongoingParams.topMargin = 16;
+
+                  muteButton = makeButton("كتم");
+                  muteButton.setOnClickListener(
+                      v -> PhoneInCallService.setMutedState(!PhoneInCallService.isMutedState())
+                  );
+                  ongoing.addView(muteButton, actionParams());
+
+                  speakerButton = makeButton("السماعة");
+                  speakerButton.setOnClickListener(v -> PhoneInCallService.toggleSpeaker());
+                  ongoing.addView(speakerButton, actionParams());
+
+                  root.addView(ongoing, ongoingParams);
+
+                  endButton = makeButton("إنهاء");
+                  endButton.setOnClickListener(v -> PhoneInCallService.disconnect());
+                  endButton.setTextColor(Color.WHITE);
+                  endButton.setBackgroundColor(Color.rgb(150, 35, 35));
+                  LinearLayout.LayoutParams endParams = new LinearLayout.LayoutParams(300, 64);
+                  endParams.topMargin = 34;
+                  root.addView(endButton, endParams);
+
+                  scroll.addView(root);
+                  setContentView(scroll);
+              }
+
+              private TextView makeText(String value, float size, int color) {
+                  TextView view = new TextView(this);
+                  view.setText(value);
+                  view.setTextSize(size);
+                  view.setTextColor(color);
+                  return view;
+              }
+
+              private Button makeButton(String label) {
+                  Button button = new Button(this);
+                  button.setText(label);
+                  button.setTextSize(16);
+                  button.setAllCaps(false);
+                  button.setTextColor(Color.WHITE);
+                  button.setBackgroundColor(Color.rgb(35, 35, 35));
+                  return button;
+              }
+
+              private LinearLayout.LayoutParams matchWrap() {
+                  return new LinearLayout.LayoutParams(
+                      LinearLayout.LayoutParams.MATCH_PARENT,
+                      LinearLayout.LayoutParams.WRAP_CONTENT
+                  );
+              }
+
+              private LinearLayout.LayoutParams actionParams() {
+                  LinearLayout.LayoutParams params =
+                      new LinearLayout.LayoutParams(0, 62, 1);
+                  params.setMargins(8, 0, 8, 0);
+                  return params;
+              }
+
+              private void registerCallReceiver() {
+                  IntentFilter filter = new IntentFilter();
+                  filter.addAction(PhoneInCallService.ACTION_CALL_UPDATED);
+                  filter.addAction(PhoneInCallService.ACTION_CALL_FINISHED);
+                  if (Build.VERSION.SDK_INT >= 33) {
+                      registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED);
+                  } else {
+                      registerReceiver(receiver, filter);
+                  }
+              }
+
+              private void render() {
+                  Call call = PhoneInCallService.getCurrentCall();
+                  if (call == null) {
+                      finish();
+                      return;
+                  }
+
+                  String number = call.getDetails().getHandle() == null
+                      ? "مكالمة"
+                      : call.getDetails().getHandle().getSchemeSpecificPart();
+                  numberView.setText(number);
+
+                  int state = call.getState();
+                  boolean ringing = state == Call.STATE_RINGING;
+                  boolean active =
+                      state == Call.STATE_ACTIVE
+                          || state == Call.STATE_HOLDING
+                          || state == Call.STATE_DIALING
+                          || state == Call.STATE_CONNECTING;
+
+                  statusView.setText(stateLabel(state));
+                  answerButton.setVisibility(ringing ? View.VISIBLE : View.GONE);
+                  rejectButton.setVisibility(ringing ? View.VISIBLE : View.GONE);
+                  muteButton.setVisibility(active && !ringing ? View.VISIBLE : View.GONE);
+                  speakerButton.setVisibility(active && !ringing ? View.VISIBLE : View.GONE);
+                  endButton.setVisibility(active ? View.VISIBLE : View.GONE);
+
+                  if (state == Call.STATE_ACTIVE && connectTimeMillis == 0L) {
+                      connectTimeMillis = call.getDetails().getConnectTimeMillis();
+                  }
+
+                  muteButton.setText(
+                      PhoneInCallService.isMutedState() ? "إلغاء الكتم" : "كتم"
+                  );
+                  speakerButton.setText(
+                      PhoneInCallService.isSpeaker() ? "السماعة مفعّلة" : "السماعة"
+                  );
+                  renderTimer();
+              }
+
+              private String stateLabel(int state) {
+                  switch (state) {
+                      case Call.STATE_RINGING:
+                          return "مكالمة واردة";
+                      case Call.STATE_DIALING:
+                          return "جارٍ الاتصال";
+                      case Call.STATE_CONNECTING:
+                          return "جارٍ التوصيل";
+                      case Call.STATE_ACTIVE:
+                          return "مكالمة جارية";
+                      case Call.STATE_HOLDING:
+                          return "معلقة";
+                      case Call.STATE_DISCONNECTED:
+                          return "انتهت المكالمة";
+                      default:
+                          return "حالة المكالمة";
+                  }
+              }
+
+              private void renderTimer() {
+                  if (timerView == null) {
+                      return;
+                  }
+                  if (connectTimeMillis <= 0L) {
+                      timerView.setText("");
+                      return;
+                  }
+
+                  long elapsed = Math.max(
+                      0L,
+                      System.currentTimeMillis() - connectTimeMillis
+                  );
+                  long totalSeconds = elapsed / 1000L;
+                  long minutes = totalSeconds / 60L;
+                  long seconds = totalSeconds % 60L;
+                  timerView.setText(
+                      String.format(Locale.US, "%02d:%02d", minutes, seconds)
+                  );
+              }
+
+              @Override
+              protected void onResume() {
+                  super.onResume();
+                  render();
+              }
+
+              @Override
+              protected void onDestroy() {
+                  handler.removeCallbacksAndMessages(null);
+                  try {
+                      unregisterReceiver(receiver);
+                  } catch (Exception ignored) {
+                  }
+                  super.onDestroy();
+              }
+          }
+          JAVA
+
           python3 - <<'PY'
           from pathlib import Path
+
           gradle_props = Path("android/gradle.properties")
           gradle_text = gradle_props.read_text() if gradle_props.exists() else ""
           watch_setting = "org.gradle.vfs.watch=false"
           if watch_setting not in gradle_text:
-              gradle_props.write_text(gradle_text.rstrip() + "\n" + watch_setting + "\n")
+              gradle_props.write_text(
+                  gradle_text.rstrip() + "\n" + watch_setting + "\n"
+              )
+
           p = Path("android/app/src/main/AndroidManifest.xml")
           s = p.read_text()
-          if 'android.permission.READ_CONTACTS' not in s:
-              s = s.replace('\n    <application', '\n    <uses-permission android:name="android.permission.READ_CONTACTS"/>\n    <application', 1)
+
+          permissions = [
+              '<uses-permission android:name="android.permission.READ_CONTACTS"/>',
+              '<uses-permission android:name="android.permission.CALL_PHONE"/>',
+              '<uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>',
+              '<uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/>',
+          ]
+          for permission in permissions:
+              if permission not in s:
+                  s = s.replace(
+                      "\n    <application",
+                      "\n    " + permission + "\n    <application",
+                      1,
+                  )
+
           s = s.replace('android:label="phone"', 'android:label="هاتف"')
-          s = s.replace('android:icon="@mipmap/ic_launcher"', 'android:icon="@drawable/app_icon"')
-          s = s.replace('android:roundIcon="@mipmap/ic_launcher_round"', 'android:roundIcon="@drawable/app_icon"')
-          dial_filter_generic = '\n'.join([
-              '        <intent-filter>',
+          s = s.replace(
+              'android:icon="@mipmap/ic_launcher"',
+              'android:icon="@drawable/app_icon"',
+          )
+          s = s.replace(
+              'android:roundIcon="@mipmap/ic_launcher_round"',
+              'android:roundIcon="@drawable/app_icon"',
+          )
+
+          dial_filter_generic = "\n".join([
+              "        <intent-filter>",
               '              <action android:name="android.intent.action.DIAL" />',
               '              <category android:name="android.intent.category.DEFAULT" />',
-              '        </intent-filter>',
-          ]) + '\n'
-          dial_filter_tel = '\n'.join([
-              '        <intent-filter>',
+              "        </intent-filter>",
+          ]) + "\n"
+          dial_filter_tel = "\n".join([
+              "        <intent-filter>",
               '              <action android:name="android.intent.action.DIAL" />',
               '              <category android:name="android.intent.category.DEFAULT" />',
               '              <data android:scheme="tel" />',
-              '        </intent-filter>',
-          ]) + '\n'
+              "        </intent-filter>",
+          ]) + "\n"
+
+          activity_start = s.find("    <activity")
+          activity_end = s.find("    </activity>", activity_start)
+          if activity_start < 0 or activity_end < 0:
+              raise RuntimeError("Main activity block not found in generated manifest")
+
           if 'android.intent.action.DIAL' not in s:
-              activity_start = s.find('    <activity')
-              activity_end = s.find('    </activity>', activity_start)
-              if activity_start < 0 or activity_end < 0:
-                  raise RuntimeError('Main activity block not found in generated manifest')
               s = s[:activity_end] + dial_filter_generic + dial_filter_tel + s[activity_end:]
           elif 'data android:scheme="tel"' not in s:
-              activity_start = s.find('    <activity')
-              activity_end = s.find('    </activity>', activity_start)
-              if activity_start < 0 or activity_end < 0:
-                  raise RuntimeError('Main activity block not found in generated manifest')
               s = s[:activity_end] + dial_filter_tel + s[activity_end:]
+
+          if 'android:name=".InCallActivity"' not in s:
+              activity = "\n".join([
+                  "    <activity",
+                  '          android:name=".InCallActivity"',
+                  '          android:exported="false"',
+                  '          android:excludeFromRecents="true"',
+                  '          android:launchMode="singleTop"',
+                  '          android:showWhenLocked="true"',
+                  '          android:turnScreenOn="true"',
+                  '          android:theme="@android:style/Theme.Material.NoActionBar">',
+                  "    </activity>",
+              ]) + "\n"
+              s = s.replace("    </application>", activity + "    </application>", 1)
+
           if 'android:name=".PhoneInCallService"' not in s:
-              service = '\n'.join([
-                  '    <service',
+              service = "\n".join([
+                  "    <service",
                   '          android:name=".PhoneInCallService"',
                   '          android:permission="android.permission.BIND_INCALL_SERVICE"',
                   '          android:exported="true">',
                   '          <meta-data android:name="android.telecom.IN_CALL_SERVICE_UI" android:value="true" />',
-                  '          <meta-data android:name="android.telecom.IN_CALL_SERVICE_CAR_MODE_UI" android:value="false" />',
                   '          <intent-filter>',
                   '              <action android:name="android.telecom.InCallService" />',
                   '          </intent-filter>',
-                  '      </service>',
-              ]) + '\n'
-              s = s.replace('    </application>', service + '    </application>', 1)
+                  "      </service>",
+              ]) + "\n"
+              s = s.replace("    </application>", service + "    </application>", 1)
+
           p.write_text(s)
           PY
 
       - name: Resolve dependencies
         run: flutter pub get
 
-      - name: Verify Android identity and icon
+      - name: Verify Android identity and dialer integration
         shell: bash
         run: |
           grep -n 'applicationId' android/app/build.gradle.kts
           grep -n 'android:label="هاتف"' android/app/src/main/AndroidManifest.xml
           grep -n 'android:icon="@drawable/app_icon"' android/app/src/main/AndroidManifest.xml
           test "$(grep -c 'android.intent.action.DIAL' android/app/src/main/AndroidManifest.xml)" -ge 2
-          grep -n 'android.intent.action.DIAL' android/app/src/main/AndroidManifest.xml
           grep -n 'android:scheme="tel"' android/app/src/main/AndroidManifest.xml
           grep -n 'android.permission.BIND_INCALL_SERVICE' android/app/src/main/AndroidManifest.xml
           grep -n 'android.telecom.IN_CALL_SERVICE_UI' android/app/src/main/AndroidManifest.xml
-          grep -n 'android.telecom.IN_CALL_SERVICE_CAR_MODE_UI' android/app/src/main/AndroidManifest.xml
+          grep -n 'android:name=".InCallActivity"' android/app/src/main/AndroidManifest.xml
+          grep -n 'android.permission.CALL_PHONE' android/app/src/main/AndroidManifest.xml
+          grep -n 'android.permission.POST_NOTIFICATIONS' android/app/src/main/AndroidManifest.xml
+          grep -n 'android.permission.USE_FULL_SCREEN_INTENT' android/app/src/main/AndroidManifest.xml
           test -s assets/icon.png
           test -s android/app/src/main/res/drawable/app_icon.png
+
+      - name: Verify generated dialer source
+        shell: bash
+        run: |
+          grep -n 'class PhoneInCallService extends InCallService' android/app/src/main/java/com/dailer/phone/PhoneInCallService.java
+          grep -n 'class InCallActivity extends Activity' android/app/src/main/java/com/dailer/phone/InCallActivity.java
+          grep -n 'TelecomManager' android/app/src/main/java/com/dailer/phone/MainActivity.java
+          grep -n 'placeCall' android/app/src/main/java/com/dailer/phone/MainActivity.java
 
       - name: Analyze
         run: flutter analyze
