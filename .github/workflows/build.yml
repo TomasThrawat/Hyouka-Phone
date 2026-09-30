@@ -37,6 +37,7 @@ jobs:
           import android.app.role.RoleManager;
           import android.content.Intent;
           import android.os.Build;
+          import android.provider.Settings;
           import android.telecom.TelecomManager;
           
           import androidx.annotation.NonNull;
@@ -87,19 +88,37 @@ jobs:
             RoleManager roleManager = getSystemService(RoleManager.class);
             if (roleManager != null
                     && roleManager.isRoleAvailable(RoleManager.ROLE_DIALER)) {
-                startActivityForResult(
-                        roleManager.createRequestRoleIntent(RoleManager.ROLE_DIALER),
-                        9001
-                );
+                try {
+                    startActivityForResult(
+                            roleManager.createRequestRoleIntent(RoleManager.ROLE_DIALER),
+                            9001
+                    );
+                    return;
+                } catch (Exception ignored) {
+                    // Fall through to system Default apps settings.
+                }
             }
+            openDefaultAppsSettings();
             return;
                   }
-                  Intent intent = new Intent(TelecomManager.ACTION_CHANGE_DEFAULT_DIALER);
-                  intent.putExtra(
-                TelecomManager.EXTRA_CHANGE_DEFAULT_DIALER_PACKAGE_NAME,
-                getPackageName()
-                  );
-                  startActivity(intent);
+                  try {
+                      Intent intent = new Intent(TelecomManager.ACTION_CHANGE_DEFAULT_DIALER);
+                      intent.putExtra(
+                    TelecomManager.EXTRA_CHANGE_DEFAULT_DIALER_PACKAGE_NAME,
+                    getPackageName()
+                      );
+                      startActivity(intent);
+                  } catch (Exception ignored) {
+                      openDefaultAppsSettings();
+                  }
+              }
+
+              private void openDefaultAppsSettings() {
+                  try {
+                      startActivity(new Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS));
+                  } catch (Exception ignored) {
+                      startActivity(new Intent(Settings.ACTION_SETTINGS));
+                  }
               }
           }
           JAVA
@@ -125,17 +144,29 @@ jobs:
           s = s.replace('android:label="phone"', 'android:label="هاتف"')
           s = s.replace('android:icon="@mipmap/ic_launcher"', 'android:icon="@drawable/app_icon"')
           s = s.replace('android:roundIcon="@mipmap/ic_launcher_round"', 'android:roundIcon="@drawable/app_icon"')
+          dial_filter_generic = '\n'.join([
+              '        <intent-filter>',
+              '              <action android:name="android.intent.action.DIAL" />',
+              '              <category android:name="android.intent.category.DEFAULT" />',
+              '        </intent-filter>',
+          ]) + '\n'
+          dial_filter_tel = '\n'.join([
+              '        <intent-filter>',
+              '              <action android:name="android.intent.action.DIAL" />',
+              '              <category android:name="android.intent.category.DEFAULT" />',
+              '              <data android:scheme="tel" />',
+              '        </intent-filter>',
+          ]) + '\n'
           if 'android.intent.action.DIAL' not in s:
-              dial_filter = '\n'.join([
-                  '        <intent-filter>',
-                  '              <action android:name="android.intent.action.DIAL" />',
-                  '              <category android:name="android.intent.category.DEFAULT" />',
-                  '              <data android:scheme="tel" />',
-                  '        </intent-filter>',
-              ]) + '\n'
               s = s.replace(
                   '        </intent-filter>\n    </activity>',
-                  '        </intent-filter>\n' + dial_filter + '    </activity>',
+                  '        </intent-filter>\n' + dial_filter_generic + dial_filter_tel + '    </activity>',
+                  1,
+              )
+          elif 'data android:scheme="tel"' not in s:
+              s = s.replace(
+                  '        </intent-filter>\n    </activity>',
+                  '        </intent-filter>\n' + dial_filter_tel + '    </activity>',
                   1,
               )
           if 'android:name=".PhoneInCallService"' not in s:
@@ -144,6 +175,8 @@ jobs:
                   '          android:name=".PhoneInCallService"',
                   '          android:permission="android.permission.BIND_INCALL_SERVICE"',
                   '          android:exported="true">',
+                  '          <meta-data android:name="android.telecom.IN_CALL_SERVICE_UI" android:value="true" />',
+                  '          <meta-data android:name="android.telecom.IN_CALL_SERVICE_CAR_MODE_UI" android:value="false" />',
                   '          <intent-filter>',
                   '              <action android:name="android.telecom.InCallService" />',
                   '          </intent-filter>',
@@ -162,6 +195,10 @@ jobs:
           grep -n 'applicationId' android/app/build.gradle.kts
           grep -n 'android:label="هاتف"' android/app/src/main/AndroidManifest.xml
           grep -n 'android:icon="@drawable/app_icon"' android/app/src/main/AndroidManifest.xml
+          grep -n 'android.intent.action.DIAL' android/app/src/main/AndroidManifest.xml
+          grep -n 'android:scheme="tel"' android/app/src/main/AndroidManifest.xml
+          grep -n 'android.permission.BIND_INCALL_SERVICE' android/app/src/main/AndroidManifest.xml
+          grep -n 'android.telecom.IN_CALL_SERVICE_UI' android/app/src/main/AndroidManifest.xml
           test -s assets/icon.png
           test -s android/app/src/main/res/drawable/app_icon.png
 
