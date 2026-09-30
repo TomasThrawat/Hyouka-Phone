@@ -616,8 +616,6 @@ jobs:
                   Window window = getWindow();
                   configureLockScreen(this, window);
                   window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-                  window.setStatusBarColor(Color.BLACK);
-                  window.setNavigationBarColor(Color.BLACK);
 
                   buildUi();
                   registerCallReceiver();
@@ -988,6 +986,7 @@ jobs:
           ! grep -n '\.getState()' android/app/src/main/java/com/dailer/phone/PhoneInCallService.java
           ! grep -n '\.getState()' android/app/src/main/java/com/dailer/phone/InCallActivity.java
           ! grep -n 'WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED\|WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON' android/app/src/main/java/com/dailer/phone/InCallActivity.java
+          ! grep -n 'setStatusBarColor\|setNavigationBarColor' android/app/src/main/java/com/dailer/phone/InCallActivity.java
 
       - name: Analyze
         run: flutter analyze
