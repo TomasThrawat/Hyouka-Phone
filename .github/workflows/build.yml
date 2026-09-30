@@ -325,13 +325,13 @@ jobs:
               }
 
               public static void answer() {
-                  if (currentCall != null && currentCall.getState() == Call.STATE_RINGING) {
+                  if (currentCall != null && currentCall.getDetails().getState() == Call.STATE_RINGING) {
                       currentCall.answer(VideoProfile.STATE_AUDIO_ONLY);
                   }
               }
 
               public static void reject() {
-                  if (currentCall != null && currentCall.getState() == Call.STATE_RINGING) {
+                  if (currentCall != null && currentCall.getDetails().getState() == Call.STATE_RINGING) {
                       currentCall.reject(false, null);
                   }
               }
@@ -478,7 +478,7 @@ jobs:
                       return;
                   }
 
-                  int state = currentCall.getState();
+                  int state = currentCall.getDetails().getState();
                   Intent intent = new Intent(this, InCallActivity.class);
                   PendingIntent pendingIntent = PendingIntent.getActivity(
                       this,
@@ -775,7 +775,7 @@ jobs:
                       : call.getDetails().getHandle().getSchemeSpecificPart();
                   numberView.setText(number);
 
-                  int state = call.getState();
+                  int state = call.getDetails().getState();
                   boolean ringing = state == Call.STATE_RINGING;
                   boolean active =
                       state == Call.STATE_ACTIVE
@@ -985,6 +985,8 @@ jobs:
           ! grep -n 'startActivityForResult' android/app/src/main/java/com/dailer/phone/MainActivity.java
           ! grep -n 'onCallAudioStateChanged' android/app/src/main/java/com/dailer/phone/PhoneInCallService.java
           ! grep -n 'new Notification.Builder(this)' android/app/src/main/java/com/dailer/phone/PhoneInCallService.java
+          ! grep -n '\.getState()' android/app/src/main/java/com/dailer/phone/PhoneInCallService.java
+          ! grep -n '\.getState()' android/app/src/main/java/com/dailer/phone/InCallActivity.java
           ! grep -n 'WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED\|WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON' android/app/src/main/java/com/dailer/phone/InCallActivity.java
 
       - name: Analyze
