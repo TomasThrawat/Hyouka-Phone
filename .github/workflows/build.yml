@@ -491,10 +491,18 @@ jobs:
                       ? "مكالمة"
                       : currentCall.getDetails().getHandle().getSchemeSpecificPart();
 
-                  Notification.Builder builder =
-                      Build.VERSION.SDK_INT >= 26
-                          ? new Notification.Builder(this, CHANNEL_ID)
-                          : new Notification.Builder(this);
+                  Notification.Builder builder;
+                  if (Build.VERSION.SDK_INT >= 26) {
+                      builder = new Notification.Builder(this, CHANNEL_ID);
+                  } else {
+                      try {
+                          builder = Notification.Builder.class
+                              .getConstructor(Context.class)
+                              .newInstance(this);
+                      } catch (Exception e) {
+                          return;
+                      }
+                  }
 
                   builder.setSmallIcon(android.R.drawable.sym_action_call)
                       .setContentTitle(title)
@@ -976,6 +984,7 @@ jobs:
           ! grep -n 'window.setShowWhenLocked\|window.setTurnScreenOn' android/app/src/main/java/com/dailer/phone/InCallActivity.java
           ! grep -n 'startActivityForResult' android/app/src/main/java/com/dailer/phone/MainActivity.java
           ! grep -n 'onCallAudioStateChanged' android/app/src/main/java/com/dailer/phone/PhoneInCallService.java
+          ! grep -n 'new Notification.Builder(this)' android/app/src/main/java/com/dailer/phone/PhoneInCallService.java
           ! grep -n 'WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED\|WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON' android/app/src/main/java/com/dailer/phone/InCallActivity.java
 
       - name: Analyze
