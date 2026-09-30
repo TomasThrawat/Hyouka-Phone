@@ -48,7 +48,7 @@ void main() {
     expect(find.text('12'), findsOneWidget);
   });
 
-  testWidgets('clear removes the current number', (tester) async {
+  testWidgets('delete can clear the current number', (tester) async {
     tester.view.physicalSize = const Size(1080, 2400);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
@@ -62,10 +62,11 @@ void main() {
 
     expect(find.text('55'), findsOneWidget);
 
-    final clearButton = find.byKey(const Key('clear_number_button'));
-    expect(clearButton, findsOneWidget);
-    await tester.ensureVisible(clearButton);
-    await tester.tap(clearButton, warnIfMissed: false);
+    final deleteButton = find.byKey(const Key('delete_number_button'));
+    expect(deleteButton, findsOneWidget);
+    await tester.ensureVisible(deleteButton);
+    await tester.tap(deleteButton, warnIfMissed: false);
+    await tester.tap(deleteButton, warnIfMissed: false);
     await tester.pump();
 
     expect(find.text('55'), findsNothing);
