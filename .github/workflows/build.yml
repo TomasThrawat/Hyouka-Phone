@@ -30,6 +30,87 @@ jobs:
         run: |
           mkdir -p android/app/src/main/res/drawable
           cp assets/icon.png android/app/src/main/res/drawable/app_icon.png
+          mkdir -p android/app/src/main/java/com/dailer/phone
+          cat > android/app/src/main/java/com/dailer/phone/MainActivity.java <<'JAVA'
+package com.dailer.phone;
+
+import android.app.role.RoleManager;
+import android.content.Intent;
+import android.os.Build;
+import android.telecom.TelecomManager;
+
+import androidx.annotation.NonNull;
+
+import io.flutter.embedding.android.FlutterActivity;
+import io.flutter.embedding.engine.FlutterEngine;
+import io.flutter.plugin.common.MethodCall;
+import io.flutter.plugin.common.MethodChannel;
+
+public class MainActivity extends FlutterActivity {
+    private static final String CHANNEL = "com.dailer.phone/default_dialer";
+
+    @Override
+    public void configureFlutterEngine(@NonNull FlutterEngine flutterEngine) {
+        super.configureFlutterEngine(flutterEngine);
+        new MethodChannel(
+                flutterEngine.getDartExecutor().getBinaryMessenger(),
+                CHANNEL
+        ).setMethodCallHandler(this::handleMethodCall);
+    }
+
+    private void handleMethodCall(MethodCall call, MethodChannel.Result result) {
+        if ("isDefaultDialer".equals(call.method)) {
+            result.success(isDefaultDialer());
+        } else if ("requestDefaultDialer".equals(call.method)) {
+            requestDefaultDialer();
+            result.success(null);
+        } else {
+            result.notImplemented();
+        }
+    }
+
+    private boolean isDefaultDialer() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            RoleManager roleManager = getSystemService(RoleManager.class);
+            return roleManager != null
+                    && roleManager.isRoleAvailable(RoleManager.ROLE_DIALER)
+                    && roleManager.isRoleHeld(RoleManager.ROLE_DIALER);
+        }
+        TelecomManager telecomManager =
+                (TelecomManager) getSystemService(TELECOM_SERVICE);
+        return telecomManager != null
+                && getPackageName().equals(telecomManager.getDefaultDialerPackage());
+    }
+
+    private void requestDefaultDialer() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            RoleManager roleManager = getSystemService(RoleManager.class);
+            if (roleManager != null
+                    && roleManager.isRoleAvailable(RoleManager.ROLE_DIALER)) {
+                startActivityForResult(
+                        roleManager.createRequestRoleIntent(RoleManager.ROLE_DIALER),
+                        9001
+                );
+            }
+            return;
+        }
+        Intent intent = new Intent(TelecomManager.ACTION_CHANGE_DEFAULT_DIALER);
+        intent.putExtra(
+                TelecomManager.EXTRA_CHANGE_DEFAULT_DIALER_PACKAGE_NAME,
+                getPackageName()
+        );
+        startActivity(intent);
+    }
+}
+JAVA
+          cat > android/app/src/main/java/com/dailer/phone/PhoneInCallService.java <<'JAVA'
+package com.dailer.phone;
+
+import android.telecom.InCallService;
+
+public class PhoneInCallService extends InCallService {
+}
+JAVA
           python3 - <<'PY'
           from pathlib import Path
           gradle_props = Path("android/gradle.properties")
@@ -44,6 +125,31 @@ jobs:
           s = s.replace('android:label="phone"', 'android:label="هاتف"')
           s = s.replace('android:icon="@mipmap/ic_launcher"', 'android:icon="@drawable/app_icon"')
           s = s.replace('android:roundIcon="@mipmap/ic_launcher_round"', 'android:roundIcon="@drawable/app_icon"')
+          if 'android.intent.action.DIAL' not in s:
+              dial_filter = '\n'.join([
+                  '        <intent-filter>',
+                  '              <action android:name="android.intent.action.DIAL" />',
+                  '              <category android:name="android.intent.category.DEFAULT" />',
+                  '              <data android:scheme="tel" />',
+                  '        </intent-filter>',
+              ]) + '\n'
+              s = s.replace(
+                  '        </intent-filter>\n    </activity>',
+                  '        </intent-filter>\n' + dial_filter + '    </activity>',
+                  1,
+              )
+          if 'android:name=".PhoneInCallService"' not in s:
+              service = '\n'.join([
+                  '    <service',
+                  '          android:name=".PhoneInCallService"',
+                  '          android:permission="android.permission.BIND_INCALL_SERVICE"',
+                  '          android:exported="true">',
+                  '          <intent-filter>',
+                  '              <action android:name="android.telecom.InCallService" />',
+                  '          </intent-filter>',
+                  '      </service>',
+              ]) + '\n'
+              s = s.replace('    </application>', service + '    </application>', 1)
           p.write_text(s)
           PY
 
