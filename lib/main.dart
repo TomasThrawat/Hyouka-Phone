@@ -621,12 +621,11 @@ class _PhoneHomePageState extends State<PhoneHomePage>
                               style: FilledButton.styleFrom(
                                 padding: EdgeInsets.zero,
                                 shape: const CircleBorder(),
-                                backgroundColor: Colors.white,
-                                foregroundColor: Colors.black,
-                                disabledBackgroundColor:
-                                    const Color(0xFF1A1A1A),
-                                disabledForegroundColor:
-                                    const Color(0xFF575757),
+                                backgroundColor: Colors.black,
+                                foregroundColor: Colors.white,
+                                 side: const BorderSide(color: Color(0xFF666666)),
+                                 disabledBackgroundColor: Colors.black,
+                                 disabledForegroundColor: const Color(0xFF888888),
                               ),
                               child: const Icon(
                                 Icons.call,
@@ -669,7 +668,7 @@ class _PhoneHomePageState extends State<PhoneHomePage>
                 children: [
                   const CircleAvatar(
                     radius: 19,
-                    backgroundColor: Color(0xFF1E1E1E),
+                    backgroundColor: Colors.black,
                     child: Icon(Icons.person_outline, size: 21, color: Colors.white),
                   ),
                   const SizedBox(width: 12),
@@ -790,7 +789,7 @@ class _PhoneHomePageState extends State<PhoneHomePage>
               Icon(
                 Icons.phone_in_talk_outlined,
                 size: 42,
-                color: Color(0xFF666666),
+                color: Color(0xFF9A9A9A),
               ),
               SizedBox(height: 12),
               Text(
@@ -840,7 +839,7 @@ class _PhoneHomePageState extends State<PhoneHomePage>
                     children: [
                       const CircleAvatar(
                         radius: 22,
-                        backgroundColor: Color(0xFF151515),
+                        backgroundColor: Colors.black,
                         child: Icon(
                           Icons.call_made,
                           color: Colors.white,
@@ -869,7 +868,7 @@ class _PhoneHomePageState extends State<PhoneHomePage>
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
-                                color: Color(0xFFB5B5B5),
+                                color: Color(0xFFC7C7C7),
                                 fontSize: 14,
                               ),
                             ),
@@ -877,7 +876,7 @@ class _PhoneHomePageState extends State<PhoneHomePage>
                             Text(
                               _formatTime(entry.time),
                               style: const TextStyle(
-                                color: Color(0xFF696969),
+                                color: Color(0xFFA8A8A8),
                                 fontSize: 12,
                               ),
                             ),
@@ -886,7 +885,7 @@ class _PhoneHomePageState extends State<PhoneHomePage>
                       ),
                       const Icon(
                         Icons.chevron_right,
-                        color: Color(0xFF666666),
+                        color: Color(0xFF9A9A9A),
                       ),
                     ],
                   ),
