@@ -246,7 +246,8 @@ void main() {
     addTearDown(tester.view.reset);
 
     final channel = const MethodChannel('com.dailer.phone/default_dialer');
-    channel.setMockMethodCallHandler((call) async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
       if (call.method == 'getRecentCalls') {
         return <Map<String, Object?>>[
           <String, Object?>{
