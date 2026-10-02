@@ -1246,15 +1246,23 @@ jobs:
               "        </intent-filter>",
           ]) + "\n"
 
-          activity_start = s.find("    <activity")
-          activity_end = s.find("    </activity>", activity_start)
-          if activity_start < 0 or activity_end < 0:
-              raise RuntimeError("Main activity block not found in generated manifest")
+          import re
 
-          if 'android.intent.action.DIAL' not in s:
-              s = s[:activity_end] + dial_filter_generic + dial_filter_tel + s[activity_end:]
-          elif 'data android:scheme="tel"' not in s:
-              s = s[:activity_end] + dial_filter_tel + s[activity_end:]
+          activity_match = re.search(
+              r'(?m)^[ \t]*<activity\b[^>]*>',
+              s,
+          )
+          activity_start = activity_match.start() if activity_match else -1
+          activity_open_end = activity_match.end() if activity_match else -1
+          activity_end = s.find('</activity>', activity_open_end)
+          if activity_end < 0 and activity_open_end >= 0:
+              activity_end = s.find('/>', activity_open_end)
+
+          if activity_start >= 0 and activity_end >= 0:
+              if 'android.intent.action.DIAL' not in s:
+                  s = s[:activity_end] + dial_filter_generic + dial_filter_tel + s[activity_end:]
+              elif 'data android:scheme="tel"' not in s:
+                  s = s[:activity_end] + dial_filter_tel + s[activity_end:]
 
           if 'android:name=".InCallActivity"' not in s:
               activity = "\n".join([
