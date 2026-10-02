@@ -240,4 +240,41 @@ void main() {
     expect(find.text('المكالمات'), findsNothing);
   });
 
+  testWidgets('native call history refresh populates recents', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    final channel = const MethodChannel('com.dailer.phone/default_dialer');
+    channel.setMockMethodCallHandler((call) async {
+      if (call.method == 'getRecentCalls') {
+        return <Map<String, Object?>>[
+          <String, Object?>{
+            'number': '789',
+            'name': 'History contact',
+            'time': DateTime(2026, 10, 1, 15, 30).millisecondsSinceEpoch,
+          },
+        ];
+      }
+      return null;
+    });
+    addTearDown(() => TestDefaultBinaryMessengerBinding.instance
+        .defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, null));
+
+    await tester.pumpWidget(const PhoneApp(
+      enableContacts: false,
+      enableDefaultDialerPrompt: false,
+    ));
+    await tester.pump(const Duration(milliseconds: 400));
+
+    await tester.tap(find.byIcon(Icons.history_outlined));
+    await tester.pump();
+
+    expect(find.byKey(const Key('recent_call_entry_0')), findsOneWidget);
+    expect(find.text('789'), findsOneWidget);
+    expect(find.text('History contact'), findsOneWidget);
+  });
+
+
 }

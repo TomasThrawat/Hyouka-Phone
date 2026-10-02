@@ -39,13 +39,19 @@ jobs:
           import android.app.role.RoleManager;
           import android.content.Intent;
           import android.content.pm.PackageManager;
+          import android.database.Cursor;
           import android.net.Uri;
           import android.os.Build;
           import android.os.Bundle;
+          import android.provider.CallLog;
           import android.provider.Settings;
           import android.telecom.TelecomManager;
 
           import androidx.annotation.NonNull;
+          import java.util.ArrayList;
+          import java.util.HashMap;
+          import java.util.List;
+          import java.util.Map;
 
           import io.flutter.embedding.android.FlutterActivity;
           import io.flutter.embedding.engine.FlutterEngine;
@@ -55,9 +61,12 @@ jobs:
           public class MainActivity extends FlutterActivity {
               private static final String CHANNEL = "com.dailer.phone/default_dialer";
               private static final int CALL_PERMISSION_REQUEST_CODE = 9002;
+              private static final int CALL_LOG_PERMISSION_REQUEST_CODE = 9003;
 
               private MethodChannel.Result pendingCallResult;
               private String pendingNumber;
+              private MethodChannel.Result pendingCallLogResult;
+              private boolean callLogPermissionRequestInProgress;
 
               @Override
               public void configureFlutterEngine(@NonNull FlutterEngine flutterEngine) {
@@ -74,6 +83,8 @@ jobs:
                   } else if ("requestDefaultDialer".equals(call.method)) {
                       requestDefaultDialer();
                       result.success(null);
+                   } else if ("getRecentCalls".equals(call.method)) {
+                       getRecentCalls(result);
                   } else if ("placeCall".equals(call.method)) {
                       String number = call.argument("number");
                       if (number == null || number.trim().isEmpty()) {
@@ -137,6 +148,70 @@ jobs:
                   }
               }
 
+              private void getRecentCalls(MethodChannel.Result result) {
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+                      && checkSelfPermission(Manifest.permission.READ_CALL_LOG)
+                          != PackageManager.PERMISSION_GRANTED) {
+                      if (callLogPermissionRequestInProgress) {
+                          result.error(
+                              "CALL_LOG_PERMISSION_BUSY",
+                              "Call-log permission request is already in progress",
+                              null
+                          );
+                          return;
+                      }
+                      pendingCallLogResult = result;
+                      callLogPermissionRequestInProgress = true;
+                      requestPermissions(
+                          new String[]{Manifest.permission.READ_CALL_LOG},
+                          CALL_LOG_PERMISSION_REQUEST_CODE
+                      );
+                      return;
+                  }
+                  result.success(readRecentCalls());
+              }
+
+              private List<Map<String, Object>> readRecentCalls() {
+                  List<Map<String, Object>> calls = new ArrayList<>();
+                  Cursor cursor = null;
+                  try {
+                      cursor = getContentResolver().query(
+                          CallLog.Calls.CONTENT_URI,
+                          new String[]{
+                              CallLog.Calls.NUMBER,
+                              CallLog.Calls.CACHED_NAME,
+                              CallLog.Calls.DATE
+                          },
+                          null,
+                          null,
+                          CallLog.Calls.DATE + " DESC"
+                      );
+                      if (cursor == null) return calls;
+
+                      int numberIndex = cursor.getColumnIndex(CallLog.Calls.NUMBER);
+                      int nameIndex = cursor.getColumnIndex(CallLog.Calls.CACHED_NAME);
+                      int dateIndex = cursor.getColumnIndex(CallLog.Calls.DATE);
+                      while (cursor.moveToNext() && calls.size() < 50) {
+                          Map<String, Object> entry = new HashMap<>();
+                          if (numberIndex >= 0) {
+                              entry.put("number", cursor.getString(numberIndex));
+                          }
+                          if (nameIndex >= 0) {
+                              entry.put("name", cursor.getString(nameIndex));
+                          }
+                          if (dateIndex >= 0) {
+                              entry.put("time", cursor.getLong(dateIndex));
+                          }
+                          calls.add(entry);
+                      }
+                  } catch (SecurityException ignored) {
+                      // Permission can be revoked while querying the provider.
+                  } finally {
+                      if (cursor != null) cursor.close();
+                  }
+                  return calls;
+              }
+
               private void placeCall(String number, MethodChannel.Result result) {
                   if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
                       && checkSelfPermission(Manifest.permission.CALL_PHONE)
@@ -176,15 +251,33 @@ jobs:
                   @NonNull int[] grantResults
               ) {
                   super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-                  if (requestCode != CALL_PERMISSION_REQUEST_CODE || pendingCallResult == null) {
+
+                  if (requestCode == CALL_LOG_PERMISSION_REQUEST_CODE) {
+                      MethodChannel.Result result = pendingCallLogResult;
+                      pendingCallLogResult = null;
+                      callLogPermissionRequestInProgress = false;
+                      if (result == null) return;
+
+                      if (grantResults.length > 0
+                          && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                          result.success(readRecentCalls());
+                      } else {
+                          result.error(
+                              "CALL_LOG_PERMISSION",
+                              "READ_CALL_LOG permission was denied",
+                              null
+                          );
+                      }
                       return;
                   }
 
+                  if (requestCode != CALL_PERMISSION_REQUEST_CODE || pendingCallResult == null) {
+                      return;
+                  }
                   MethodChannel.Result result = pendingCallResult;
                   String number = pendingNumber;
                   pendingCallResult = null;
                   pendingNumber = null;
-
                   if (grantResults.length > 0
                       && grantResults[0] == PackageManager.PERMISSION_GRANTED
                       && number != null) {
@@ -208,6 +301,7 @@ jobs:
           import android.content.Intent;
           import android.os.Build;
           import android.telecom.Call;
+          import android.telecom.CallAudioState;
           import android.telecom.CallEndpoint;
           import android.telecom.CallEndpointException;
           import android.telecom.InCallService;
@@ -225,6 +319,7 @@ jobs:
               private static PhoneInCallService instance;
               private static Call currentCall;
               private static boolean muted;
+              private static int legacyAudioRoute = -1;
               private static final List<CallEndpoint> availableEndpoints = new ArrayList<>();
 
               private final Call.Callback callCallback = new Call.Callback() {
@@ -260,6 +355,7 @@ jobs:
                   currentCall = call;
                   call.registerCallback(callCallback);
                   muted = false;
+                   syncLegacyAudioRoute();
                   showCallUi();
                   refreshNotification();
               }
@@ -297,6 +393,14 @@ jobs:
 
               @Override
               public void onCallEndpointChanged(CallEndpoint endpoint) {
+                  broadcastUpdate();
+              }
+
+              @Override
+              public void onCallAudioStateChanged(CallAudioState audioState) {
+                  if (audioState != null) {
+                      legacyAudioRoute = audioState.getRoute();
+                  }
                   broadcastUpdate();
               }
 
@@ -389,29 +493,20 @@ jobs:
               }
 
               private static void setLegacySpeakerRoute(PhoneInCallService service) {
-                  try {
-                      Class<?> stateClass = Class.forName("android.telecom.CallAudioState");
-                      int speaker = stateClass.getField("ROUTE_SPEAKER").getInt(null);
-                      int wiredOrEarpiece =
-                          stateClass.getField("ROUTE_WIRED_OR_EARPIECE").getInt(null);
+                  CallAudioState state = service.getCallAudioState();
+                  if (state != null) legacyAudioRoute = state.getRoute();
+                  int currentRoute = legacyAudioRoute;
+                  if (currentRoute < 0) currentRoute = CallAudioState.ROUTE_EARPIECE;
+                  int target = currentRoute == CallAudioState.ROUTE_SPEAKER
+                      ? CallAudioState.ROUTE_EARPIECE
+                      : CallAudioState.ROUTE_SPEAKER;
+                  service.setAudioRoute(target);
+              }
 
-                      Object state =
-                          InCallService.class.getMethod("getCallAudioState").invoke(service);
-                      int currentRoute = wiredOrEarpiece;
-                      if (state != null) {
-                          Object route = state.getClass().getMethod("getRoute").invoke(state);
-                          if (route instanceof Integer) {
-                              currentRoute = (Integer) route;
-                          }
-                      }
-
-                      int target = currentRoute == speaker ? wiredOrEarpiece : speaker;
-                      InCallService.class
-                          .getMethod("setAudioRoute", int.class)
-                          .invoke(service, target);
-                  } catch (Exception ignored) {
-                      // Best-effort fallback for pre-Android-14 routing.
-                  }
+              private static void syncLegacyAudioRoute() {
+                  if (instance == null || Build.VERSION.SDK_INT >= 34) return;
+                  CallAudioState state = instance.getCallAudioState();
+                  if (state != null) legacyAudioRoute = state.getRoute();
               }
 
               public static boolean isSpeaker() {
@@ -427,19 +522,8 @@ jobs:
               }
 
               private static boolean isLegacySpeaker(PhoneInCallService service) {
-                  try {
-                      Class<?> stateClass = Class.forName("android.telecom.CallAudioState");
-                      int speaker = stateClass.getField("ROUTE_SPEAKER").getInt(null);
-                      Object state =
-                          InCallService.class.getMethod("getCallAudioState").invoke(service);
-                      if (state == null) {
-                          return false;
-                      }
-                      Object route = state.getClass().getMethod("getRoute").invoke(state);
-                      return route instanceof Integer && ((Integer) route) == speaker;
-                  } catch (Exception ignored) {
-                      return false;
-                  }
+                  syncLegacyAudioRoute();
+                  return legacyAudioRoute == CallAudioState.ROUTE_SPEAKER;
               }
 
               private void applyMuted(boolean value) {
@@ -710,7 +794,7 @@ jobs:
                   button.setTextColor(Color.WHITE);
                   button.setMinHeight(0);
                   button.setMinWidth(0);
-                  button.setBackground(circleBackground(backgroundColor, strokeColor, 1));
+                  button.setBackground(circleBackground(Color.BLACK, strokeColor, 1));
                   return button;
               }
 
@@ -724,7 +808,7 @@ jobs:
                   button.setPadding(dp(12), 0, dp(12), 0);
                   button.setBackground(
                       roundedBackground(
-                          Color.rgb(24, 24, 24),
+                          Color.BLACK,
                           18f,
                           Color.rgb(56, 56, 56),
                           1
@@ -802,7 +886,7 @@ jobs:
                   avatarFrame.setGravity(Gravity.CENTER);
                   avatarFrame.setBackground(
                       circleBackground(
-                          Color.rgb(28, 28, 28),
+                          Color.BLACK,
                           Color.rgb(52, 52, 52),
                           1
                       )
@@ -812,7 +896,7 @@ jobs:
                   avatarView = makeText("?", 44, Color.WHITE);
                   avatarView.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
                   avatarView.setBackground(
-                      circleBackground(Color.rgb(45, 45, 45), Color.TRANSPARENT, 0)
+                      circleBackground(Color.BLACK, Color.rgb(48, 48, 48), 1)
                   );
                   avatarFrame.addView(avatarView, fixed(104, 104));
                   root.addView(avatarFrame, fixed(120, 120));
@@ -841,7 +925,7 @@ jobs:
                   numberParams.topMargin = dp(6);
                   root.addView(numberView, numberParams);
 
-                  timerView = makeText("", 15, Color.rgb(105, 105, 105));
+                  timerView = makeText("", 15, Color.rgb(175, 175, 175));
                   LinearLayout.LayoutParams timerParams = matchWrap();
                   timerParams.topMargin = dp(6);
                   root.addView(timerView, timerParams);
@@ -1123,6 +1207,7 @@ jobs:
 
           permissions = [
               '<uses-permission android:name="android.permission.READ_CONTACTS"/>',
+              '<uses-permission android:name="android.permission.READ_CALL_LOG"/>',
               '<uses-permission android:name="android.permission.CALL_PHONE"/>',
               '<uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>',
               '<uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/>',
@@ -1230,9 +1315,13 @@ jobs:
           grep -n 'class InCallActivity extends Activity' android/app/src/main/java/com/dailer/phone/InCallActivity.java
           grep -n 'TelecomManager' android/app/src/main/java/com/dailer/phone/MainActivity.java
           grep -n 'placeCall' android/app/src/main/java/com/dailer/phone/MainActivity.java
+           grep -n 'getRecentCalls' android/app/src/main/java/com/dailer/phone/MainActivity.java
+           grep -n 'READ_CALL_LOG' android/app/src/main/java/com/dailer/phone/MainActivity.java
           ! grep -n 'window.setShowWhenLocked\|window.setTurnScreenOn' android/app/src/main/java/com/dailer/phone/InCallActivity.java
           ! grep -n 'startActivityForResult' android/app/src/main/java/com/dailer/phone/MainActivity.java
-          ! grep -n 'onCallAudioStateChanged' android/app/src/main/java/com/dailer/phone/PhoneInCallService.java
+           grep -n 'onCallAudioStateChanged' android/app/src/main/java/com/dailer/phone/PhoneInCallService.java
+           grep -n 'legacyAudioRoute' android/app/src/main/java/com/dailer/phone/PhoneInCallService.java
+           grep -n 'setAudioRoute' android/app/src/main/java/com/dailer/phone/PhoneInCallService.java
           ! grep -n 'new Notification.Builder(this)' android/app/src/main/java/com/dailer/phone/PhoneInCallService.java
           ! grep -n '\.getState()' android/app/src/main/java/com/dailer/phone/PhoneInCallService.java
           ! grep -n '\.getState()' android/app/src/main/java/com/dailer/phone/InCallActivity.java

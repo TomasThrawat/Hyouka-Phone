@@ -30,14 +30,14 @@ class PhoneApp extends StatelessWidget {
         scaffoldBackgroundColor: Colors.black,
         colorScheme: const ColorScheme.dark(
           surface: Colors.black,
-          surfaceContainer: Color(0xFF111111),
+          surfaceContainer: Colors.black,
           primary: Colors.white,
           onPrimary: Colors.black,
           onSurface: Colors.white,
         ),
         navigationBarTheme: const NavigationBarThemeData(
           backgroundColor: Colors.black,
-          indicatorColor: Color(0xFF242424),
+          indicatorColor: Colors.black,
         ),
       ),
       home: PhoneHomePage(
@@ -114,6 +114,7 @@ class _PhoneHomePageState extends State<PhoneHomePage>
     super.initState();
     _recents = List<CallEntry>.unmodifiable(widget.initialRecents);
     WidgetsBinding.instance.addObserver(this);
+    _loadRecents();
     if (widget.enableContacts) {
       _loadContacts();
     } else {
@@ -155,10 +156,12 @@ class _PhoneHomePageState extends State<PhoneHomePage>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed &&
-        _defaultDialerRequestInProgress) {
-      _defaultDialerRequestInProgress = false;
-      _verifyDefaultDialerAfterRequest();
+    if (state == AppLifecycleState.resumed) {
+      _loadRecents();
+      if (_defaultDialerRequestInProgress) {
+        _defaultDialerRequestInProgress = false;
+        _verifyDefaultDialerAfterRequest();
+      }
     }
   }
 
@@ -242,6 +245,46 @@ class _PhoneHomePageState extends State<PhoneHomePage>
     return value
         .replaceAll(RegExp(r'[\s()\-]'), '')
         .replaceAll(RegExp(r'[^0-9+*#]'), '');
+  }
+
+  Future<void> _loadRecents() async {
+    try {
+      final raw = await _defaultDialerChannel.invokeMethod<List<dynamic>>(
+        'getRecentCalls',
+      );
+      if (!mounted || raw == null) return;
+
+      final recents = raw
+          .whereType<Map>()
+          .map((item) {
+            final number = item['number']?.toString().trim() ?? '';
+            final nameValue = item['name']?.toString().trim();
+            final timeValue = item['time'];
+            final millis = timeValue is num
+                ? timeValue.toInt()
+                : int.tryParse(timeValue?.toString() ?? '');
+            if (millis == null || number.isEmpty) return null;
+
+            return CallEntry(
+              number: number,
+              name: nameValue == null || nameValue.isEmpty ? null : nameValue,
+              time: DateTime.fromMillisecondsSinceEpoch(millis),
+            );
+          })
+          .whereType<CallEntry>()
+          .take(50)
+          .toList(growable: false);
+
+      setState(() {
+        _recents = List<CallEntry>.unmodifiable(recents);
+      });
+    } on MissingPluginException {
+      // Android is unavailable in widget tests.
+    } on PlatformException {
+      // Keep the in-memory fallback when call-log access is unavailable.
+    } catch (_) {
+      // Keep the in-memory fallback for malformed platform data.
+    }
   }
 
   Future<void> _loadContacts() async {
@@ -608,7 +651,7 @@ class _PhoneHomePageState extends State<PhoneHomePage>
     return Container(
       constraints: const BoxConstraints(maxHeight: 96),
       decoration: BoxDecoration(
-        color: const Color(0xFF101010),
+        color: Colors.black,
         borderRadius: BorderRadius.circular(20),
       ),
       clipBehavior: Clip.antiAlias,
@@ -671,7 +714,7 @@ class _PhoneHomePageState extends State<PhoneHomePage>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFF111111),
+        color: Colors.black,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: const Color(0xFF222222)),
       ),
@@ -713,7 +756,7 @@ class _PhoneHomePageState extends State<PhoneHomePage>
             label: const Text('اتصال'),
             style: FilledButton.styleFrom(
               foregroundColor: Colors.white,
-              backgroundColor: const Color(0xFF252525),
+              backgroundColor: Colors.black,
             ),
           ),
           const SizedBox(width: 8),
@@ -886,7 +929,7 @@ class _DialKey extends StatelessWidget {
         onPressed: onTap,
         style: FilledButton.styleFrom(
           padding: EdgeInsets.zero,
-          backgroundColor: const Color(0xFF121212),
+          backgroundColor: Colors.black,
           foregroundColor: Colors.white,
           shape: const CircleBorder(),
         ),
