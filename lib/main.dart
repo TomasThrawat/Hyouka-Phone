@@ -462,14 +462,14 @@ class _PhoneHomePageState extends State<PhoneHomePage>
         onDestinationSelected: (index) => setState(() => _tab = index),
         destinations: const [
           NavigationDestination(
-            icon: Icon(Icons.dialpad_outlined),
-            selectedIcon: Icon(Icons.dialpad),
+            icon: Icon(Icons.dialpad_outlined, color: Colors.white),
+            selectedIcon: Icon(Icons.dialpad, color: Colors.white),
             label: '',
             tooltip: 'لوحة الأرقام',
           ),
           NavigationDestination(
-            icon: Icon(Icons.history_outlined),
-            selectedIcon: Icon(Icons.history),
+            icon: Icon(Icons.history_outlined, color: Colors.white),
+            selectedIcon: Icon(Icons.history, color: Colors.white),
             label: '',
             tooltip: 'المكالمات',
           ),
@@ -630,6 +630,7 @@ class _PhoneHomePageState extends State<PhoneHomePage>
                               child: const Icon(
                                 Icons.call,
                                 size: 26,
+                                color: Colors.white,
                               ),
                             ),
                           ),
