@@ -71,6 +71,8 @@ class PendingCall {
   final String? name;
 }
 
+enum _RecentCallAction { delete, block }
+
 class PhoneHomePage extends StatefulWidget {
   const PhoneHomePage({
     super.key,
@@ -103,6 +105,7 @@ class _PhoneHomePageState extends State<PhoneHomePage>
   List<Contact> _contacts = const [];
   List<CallEntry> _recents = const [];
   PendingCall? _pendingCall;
+  Set<String> _blockedNumbers = <String>{};
   bool _defaultDialerPromptShown = false;
   bool _defaultDialerRequestInProgress = false;
 
@@ -272,6 +275,7 @@ class _PhoneHomePageState extends State<PhoneHomePage>
             );
           })
           .whereType<CallEntry>()
+          .where((entry) => !_isBlockedNumber(entry.number))
           .take(50)
           .toList(growable: false);
 
@@ -383,6 +387,104 @@ class _PhoneHomePageState extends State<PhoneHomePage>
       _number = number;
       _pendingCall = PendingCall(number: dialable, name: name);
     });
+  }
+
+  bool _isBlockedNumber(String number) {
+    final normalized = _dialableNumber(number);
+    return normalized.isNotEmpty && _blockedNumbers.contains(normalized);
+  }
+
+  Future<void> _showRecentCallActions(int index) async {
+    if (index < 0 || index >= _recents.length) return;
+    final entry = _recents[index];
+
+    final action = await showModalBottomSheet<_RecentCallAction>(
+      context: context,
+      backgroundColor: const Color(0xFF101010),
+      showDragHandle: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        final title = entry.name?.isNotEmpty == true ? entry.name! : entry.number;
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 4, 24, 12),
+                child: Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              ListTile(
+                key: const Key('recent_call_delete_action'),
+                leading: const Icon(Icons.delete_outline, color: Colors.white),
+                title: const Text(
+                  'حذف',
+                  style: TextStyle(color: Colors.white),
+                ),
+                onTap: () => Navigator.of(context).pop(_RecentCallAction.delete),
+              ),
+              ListTile(
+                key: const Key('recent_call_block_action'),
+                leading: const Icon(Icons.block_outlined, color: Colors.white),
+                title: const Text(
+                  'حظر',
+                  style: TextStyle(color: Colors.white),
+                ),
+                onTap: () => Navigator.of(context).pop(_RecentCallAction.block),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+
+    switch (action) {
+      case _RecentCallAction.delete:
+        _deleteRecentAt(index);
+        break;
+      case _RecentCallAction.block:
+        _blockRecentAt(index);
+        break;
+      case null:
+        break;
+    }
+  }
+
+  void _deleteRecentAt(int index) {
+    if (index < 0 || index >= _recents.length) return;
+    final updated = List<CallEntry>.from(_recents)..removeAt(index);
+    setState(() {
+      _recents = List<CallEntry>.unmodifiable(updated);
+    });
+    _showMessage('تم حذف المكالمة');
+  }
+
+  void _blockRecentAt(int index) {
+    if (index < 0 || index >= _recents.length) return;
+    final normalized = _dialableNumber(_recents[index].number);
+    if (normalized.isEmpty) return;
+
+    final blocked = Set<String>.from(_blockedNumbers)..add(normalized);
+    final updated = _recents
+        .where((entry) => _dialableNumber(entry.number) != normalized)
+        .toList(growable: false);
+
+    setState(() {
+      _blockedNumbers = blocked;
+      _recents = List<CallEntry>.unmodifiable(updated);
+    });
+    _showMessage('تم حظر الرقم');
   }
 
   Future<void> _placeCall(String number, {String? name}) async {
@@ -830,6 +932,7 @@ class _PhoneHomePageState extends State<PhoneHomePage>
                   entry.number,
                   name: entry.name,
                 ),
+                onLongPress: () => _showRecentCallActions(index),
                 borderRadius: BorderRadius.circular(18),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
