@@ -278,4 +278,83 @@ void main() {
   });
 
 
+
+  testWidgets('long press on recent call shows delete and block actions', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PhoneHomePage(
+          enableContacts: false,
+          enableDefaultDialerPrompt: false,
+          initialRecents: [
+            CallEntry(
+              number: '01012345678',
+              name: 'Test Contact',
+              time: DateTime(2026, 1, 1, 12),
+            ),
+          ],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final recent = find.byKey(const Key('recent_call_entry_0'));
+    expect(recent, findsOneWidget);
+
+    await tester.longPress(recent);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('recent_call_delete_action')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('recent_call_block_action')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('delete and block recent call actions remove entries', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PhoneHomePage(
+          enableContacts: false,
+          enableDefaultDialerPrompt: false,
+          initialRecents: [
+            CallEntry(
+              number: '01012345678',
+              name: 'Blocked Contact',
+              time: DateTime(2026, 1, 1, 12),
+            ),
+            CallEntry(
+              number: '01087654321',
+              name: 'Keep Contact',
+              time: DateTime(2026, 1, 2, 12),
+            ),
+          ],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.longPress(
+      find.byKey(const Key('recent_call_entry_0')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('recent_call_delete_action')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('01012345678'), findsNothing);
+    expect(find.text('01087654321'), findsOneWidget);
+
+    await tester.longPress(
+      find.byKey(const Key('recent_call_entry_0')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('recent_call_block_action')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('01087654321'), findsNothing);
+    expect(find.text('لا توجد مكالمات حديثة'), findsOneWidget);
+  });
+
 }
