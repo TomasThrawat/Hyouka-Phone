@@ -1227,6 +1227,14 @@ jobs:
                   return null;
               }
 
+              private String avatarLetter(String name, String number) {
+                  String source = !TextUtils.isEmpty(name) ? name : number;
+                  if (TextUtils.isEmpty(source)) {
+                      return "?";
+                  }
+                  return source.substring(0, 1).toUpperCase(Locale.getDefault());
+              }
+
               private void render() {
                   Call call = PhoneInCallService.getCurrentCall();
                   if (call == null) {
