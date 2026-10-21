@@ -1323,6 +1323,9 @@ jobs:
           grep -n 'android.permission.BIND_INCALL_SERVICE' android/app/src/main/AndroidManifest.xml
           grep -n 'android.telecom.IN_CALL_SERVICE_UI' android/app/src/main/AndroidManifest.xml
           grep -n 'android:name=".InCallActivity"' android/app/src/main/AndroidManifest.xml
+          grep -n 'android.permission.READ_CALL_LOG' android/app/src/main/AndroidManifest.xml
+          grep -n 'android.permission.READ_PHONE_STATE' android/app/src/main/AndroidManifest.xml
+          grep -n 'android.permission.ANSWER_PHONE_CALLS' android/app/src/main/AndroidManifest.xml
           grep -n 'android.permission.CALL_PHONE' android/app/src/main/AndroidManifest.xml
           grep -n 'android.permission.POST_NOTIFICATIONS' android/app/src/main/AndroidManifest.xml
           grep -n 'android.permission.USE_FULL_SCREEN_INTENT' android/app/src/main/AndroidManifest.xml

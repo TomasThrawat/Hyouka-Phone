@@ -612,8 +612,8 @@ class _PhoneHomePageState extends State<PhoneHomePage>
             style: const TextStyle(color: Colors.white, fontSize: 16),
             cursorColor: Colors.white,
             decoration: InputDecoration(
-              hintText: 'بحث',
-              hintStyle: const TextStyle(color: Color(0xFF888888)),
+              labelText: 'بحث',
+              labelStyle: const TextStyle(color: Color(0xFF888888)),
               prefixIcon: const Icon(Icons.search, color: Color(0xFFAAAAAA)),
               suffixIcon: _recentSearchController.text.isEmpty
                   ? null
