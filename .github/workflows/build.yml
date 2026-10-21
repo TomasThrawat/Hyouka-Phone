@@ -314,7 +314,8 @@ jobs:
           import java.util.ArrayList;
           import java.util.List;
 
-          @SuppressWarnings("deprecation")\n          public class PhoneInCallService extends InCallService {
+          @SuppressWarnings("deprecation")
+          public class PhoneInCallService extends InCallService {
               public static final String ACTION_CALL_UPDATED = "com.dailer.phone.CALL_UPDATED";
               public static final String ACTION_CALL_FINISHED = "com.dailer.phone.CALL_FINISHED";
               private static final int NOTIFICATION_ID = 6466;
@@ -1331,7 +1332,8 @@ jobs:
       - name: Verify generated dialer source
         shell: bash
         run: |
-          grep -n 'class PhoneInCallService extends InCallService' android/app/src/main/java/com/dailer/phone/PhoneInCallService.java\n          grep -n '@SuppressWarnings(\"deprecation\")' android/app/src/main/java/com/dailer/phone/PhoneInCallService.java
+          grep -n 'class PhoneInCallService extends InCallService' android/app/src/main/java/com/dailer/phone/PhoneInCallService.java
+          grep -n '@SuppressWarnings(\"deprecation\")' android/app/src/main/java/com/dailer/phone/PhoneInCallService.java
           grep -n 'class InCallActivity extends Activity' android/app/src/main/java/com/dailer/phone/InCallActivity.java
           grep -n 'TelecomManager' android/app/src/main/java/com/dailer/phone/MainActivity.java
           grep -n 'placeCall' android/app/src/main/java/com/dailer/phone/MainActivity.java
