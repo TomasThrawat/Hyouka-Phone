@@ -658,7 +658,7 @@ class _PhoneHomePageState extends State<PhoneHomePage>
               : ListView.separated(
                   padding: const EdgeInsets.fromLTRB(18, 6, 18, 20),
                   itemCount: visibleRecents.length,
-                  separatorBuilder: (_, __) => const Divider(
+                  separatorBuilder: (_, _) => const Divider(
                     height: 1,
                     color: Color(0xFF1B1B1B),
                   ),
