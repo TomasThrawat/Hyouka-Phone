@@ -1,5 +1,5 @@
 name: phone
-description: Flutter phone dialer app with contact matching and recent call actions.
+description: Minimal Flutter dialer UI with searchable recent calls.
 publish_to: "none"
 version: 1.0.0+1
 
@@ -9,7 +9,6 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  flutter_contacts: ^2.5.0
   url_launcher: ^6.3.2
 
 dev_dependencies:

@@ -11,7 +11,7 @@ void main() {
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
 
-    await tester.pumpWidget(const PhoneApp(enableContacts: false, enableDefaultDialerPrompt: false));
+    await tester.pumpWidget(const PhoneApp(enableDefaultDialerPrompt: false));
     await tester.pump(const Duration(milliseconds: 300));
 
     expect(find.text('هاتف'), findsOneWidget);
@@ -33,7 +33,7 @@ void main() {
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
 
-    await tester.pumpWidget(const PhoneApp(enableContacts: false, enableDefaultDialerPrompt: false));
+    await tester.pumpWidget(const PhoneApp(enableDefaultDialerPrompt: false));
     await tester.pump(const Duration(milliseconds: 300));
 
     await tester.tap(find.text('1'));
@@ -54,7 +54,7 @@ void main() {
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
 
-    await tester.pumpWidget(const PhoneApp(enableContacts: false, enableDefaultDialerPrompt: false));
+    await tester.pumpWidget(const PhoneApp(enableDefaultDialerPrompt: false));
     await tester.pump(const Duration(milliseconds: 300));
 
     await tester.tap(find.text('5'));
@@ -97,7 +97,6 @@ void main() {
     );
 
     await tester.pumpWidget(const PhoneApp(
-      enableContacts: false,
       enableDefaultDialerPrompt: false,
     ));
     await tester.pump(const Duration(milliseconds: 300));
@@ -138,8 +137,7 @@ void main() {
     );
 
     await tester.pumpWidget(PhoneApp(
-      enableContacts: false,
-      enableDefaultDialerPrompt: false,
+            enableDefaultDialerPrompt: false,
       initialRecents: [
         CallEntry(
           number: '456',
@@ -194,7 +192,7 @@ void main() {
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
 
-    await tester.pumpWidget(const PhoneApp(enableContacts: false, enableDefaultDialerPrompt: false));
+    await tester.pumpWidget(const PhoneApp(enableDefaultDialerPrompt: false));
     await tester.pump();
 
     await tester.tap(find.text('7'));
@@ -218,20 +216,21 @@ void main() {
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
 
-    await tester.pumpWidget(const PhoneApp(enableContacts: false, enableDefaultDialerPrompt: false));
+    await tester.pumpWidget(const PhoneApp(enableDefaultDialerPrompt: false));
     await tester.pump(const Duration(milliseconds: 300));
 
     await tester.tap(find.byIcon(Icons.history_outlined));
     await tester.pump(const Duration(milliseconds: 300));
 
     expect(find.text('لا توجد مكالمات حديثة'), findsOneWidget);
-  });  testWidgets('bottom navigation uses icons only', (tester) async {
+  });
+
+  testWidgets('bottom navigation uses icons only', (tester) async {
     tester.view.physicalSize = const Size(1080, 2400);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
 
     await tester.pumpWidget(const PhoneApp(
-      enableContacts: false,
       enableDefaultDialerPrompt: false,
     ));
     await tester.pump(const Duration(milliseconds: 300));
@@ -264,7 +263,6 @@ void main() {
         .setMockMethodCallHandler(channel, null));
 
     await tester.pumpWidget(const PhoneApp(
-      enableContacts: false,
       enableDefaultDialerPrompt: false,
     ));
     await tester.pump(const Duration(milliseconds: 400));
@@ -277,5 +275,35 @@ void main() {
     expect(find.text('History contact'), findsOneWidget);
   });
 
+  testWidgets('recents search filters by caller name and number', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(PhoneApp(
+      enableDefaultDialerPrompt: false,
+      initialRecents: [
+        CallEntry(number: '01012345678', name: 'Example Caller', time: DateTime(2026, 10, 1, 15, 30)),
+        CallEntry(number: '01198765432', name: 'Another Caller', time: DateTime(2026, 10, 2, 10, 15)),
+      ],
+    ));
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.tap(find.byIcon(Icons.history_outlined));
+    await tester.pump();
+
+    expect(find.byKey(const Key('recent_search_field')), findsOneWidget);
+    expect(find.text('01012345678'), findsOneWidget);
+    expect(find.text('01198765432'), findsOneWidget);
+
+    await tester.enterText(find.byKey(const Key('recent_search_field')), 'Another');
+    await tester.pump();
+    expect(find.text('01198765432'), findsOneWidget);
+    expect(find.text('01012345678'), findsNothing);
+
+    await tester.enterText(find.byKey(const Key('recent_search_field')), '010123');
+    await tester.pump();
+    expect(find.text('01012345678'), findsOneWidget);
+    expect(find.text('01198765432'), findsNothing);
+  });
 
 }

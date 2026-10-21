@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 void main() {
@@ -10,12 +9,10 @@ void main() {
 class PhoneApp extends StatelessWidget {
   const PhoneApp({
     super.key,
-    this.enableContacts = true,
     this.enableDefaultDialerPrompt = true,
     this.initialRecents = const [],
   });
 
-  final bool enableContacts;
   final bool enableDefaultDialerPrompt;
   final List<CallEntry> initialRecents;
 
@@ -41,7 +38,6 @@ class PhoneApp extends StatelessWidget {
         ),
       ),
       home: PhoneHomePage(
-        enableContacts: enableContacts,
         enableDefaultDialerPrompt: enableDefaultDialerPrompt,
         initialRecents: initialRecents,
       ),
@@ -74,12 +70,10 @@ class PendingCall {
 class PhoneHomePage extends StatefulWidget {
   const PhoneHomePage({
     super.key,
-    this.enableContacts = true,
     this.enableDefaultDialerPrompt = true,
     this.initialRecents = const [],
   });
 
-  final bool enableContacts;
   final bool enableDefaultDialerPrompt;
   final List<CallEntry> initialRecents;
 
@@ -98,10 +92,8 @@ class _PhoneHomePageState extends State<PhoneHomePage>
 
   String _number = '';
   int _tab = 0;
-  bool _loadingContacts = false;
-  bool _contactsLoaded = false;
-  List<Contact> _contacts = const [];
   List<CallEntry> _recents = const [];
+  final TextEditingController _recentSearchController = TextEditingController();
   PendingCall? _pendingCall;
   bool _defaultDialerPromptShown = false;
   bool _defaultDialerRequestInProgress = false;
@@ -115,11 +107,6 @@ class _PhoneHomePageState extends State<PhoneHomePage>
     _recents = List<CallEntry>.unmodifiable(widget.initialRecents);
     WidgetsBinding.instance.addObserver(this);
     _loadRecents();
-    if (widget.enableContacts) {
-      _loadContacts();
-    } else {
-      _contactsLoaded = true;
-    }
     if (widget.enableDefaultDialerPrompt) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _maybePromptForDefaultDialer();
@@ -178,6 +165,7 @@ class _PhoneHomePageState extends State<PhoneHomePage>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _recentSearchController.dispose();
     super.dispose();
   }
 
@@ -210,35 +198,6 @@ class _PhoneHomePageState extends State<PhoneHomePage>
         ],
       ),
     );
-  }
-
-  String _digitsOnly(String value) {
-    const replacements = <String, String>{
-      '٠': '0',
-      '١': '1',
-      '٢': '2',
-      '٣': '3',
-      '٤': '4',
-      '٥': '5',
-      '٦': '6',
-      '٧': '7',
-      '٨': '8',
-      '٩': '9',
-      '۰': '0',
-      '۱': '1',
-      '۲': '2',
-      '۳': '3',
-      '۴': '4',
-      '۵': '5',
-      '۶': '6',
-      '۷': '7',
-      '۸': '8',
-      '۹': '9',
-    };
-
-    var output = value;
-    replacements.forEach((from, to) => output = output.replaceAll(from, to));
-    return output.replaceAll(RegExp(r'\D'), '');
   }
 
   String _dialableNumber(String value) {
@@ -285,73 +244,6 @@ class _PhoneHomePageState extends State<PhoneHomePage>
     } catch (_) {
       // Keep the in-memory fallback for malformed platform data.
     }
-  }
-
-  Future<void> _loadContacts() async {
-    if (_contactsLoaded || _loadingContacts) return;
-    setState(() => _loadingContacts = true);
-
-    try {
-      final permission = await FlutterContacts.permissions.request(PermissionType.read);
-      if (permission == PermissionStatus.granted ||
-          permission == PermissionStatus.limited) {
-        final contacts = await FlutterContacts.getAll(
-          properties: const {
-            ContactProperty.name,
-            ContactProperty.phone,
-          },
-        );
-
-        if (mounted) {
-          setState(() {
-            _contacts = contacts;
-            _contactsLoaded = true;
-          });
-        }
-      } else if (mounted) {
-        setState(() => _contactsLoaded = true);
-      }
-    } catch (_) {
-      if (mounted) {
-        setState(() => _contactsLoaded = true);
-      }
-    } finally {
-      if (mounted) setState(() => _loadingContacts = false);
-    }
-  }
-
-  List<_ContactMatch> get _matches {
-    final typed = _digitsOnly(_number);
-    if (typed.isEmpty || !_contactsLoaded) return const [];
-
-    final results = <_ContactMatch>[];
-    final seen = <String>{};
-
-    for (final contact in _contacts) {
-      for (final phone in contact.phones) {
-        final raw = phone.number.trim();
-        final digits = _digitsOnly(raw);
-        if (digits.isEmpty) continue;
-
-        final matches =
-            digits == typed || digits.endsWith(typed) || digits.contains(typed);
-        if (!matches) continue;
-
-        final key = '${contact.id.toString()}:$raw';
-        if (seen.add(key)) {
-          results.add(
-            _ContactMatch(
-              name: contact.displayName?.trim().isNotEmpty == true
-                  ? contact.displayName!.trim()
-                  : raw,
-              number: raw,
-            ),
-          );
-        }
-      }
-    }
-
-    return results.take(5).toList(growable: false);
   }
 
   void _append(String value) {
@@ -525,24 +417,10 @@ class _PhoneHomePageState extends State<PhoneHomePage>
                     ),
                   ),
                 ),
-                if (_loadingContacts && !_contactsLoaded)
-                  const Padding(
-                    padding: EdgeInsets.only(top: 10),
-                    child: SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                  ),
                 if (_pendingCall != null)
                   Padding(
                     padding: const EdgeInsets.fromLTRB(18, 10, 18, 0),
                     child: _buildCallActions(_pendingCall!),
-                  ),
-                if (_pendingCall == null && _matches.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(18, 8, 18, 0),
-                    child: _buildContactMatches(),
                   ),
                 const SizedBox(height: 8),
                 Expanded(
@@ -647,69 +525,6 @@ class _PhoneHomePageState extends State<PhoneHomePage>
     );
   }
 
-  Widget _buildContactMatches() {
-    return Container(
-      constraints: const BoxConstraints(maxHeight: 96),
-      decoration: BoxDecoration(
-        color: Colors.black,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: ListView.separated(
-        shrinkWrap: true,
-        itemCount: _matches.length,
-        separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFF202020)),
-        itemBuilder: (context, index) {
-          final match = _matches[index];
-          return InkWell(
-            onTap: () => _selectCall(match.number, name: match.name),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              child: Row(
-                children: [
-                  const CircleAvatar(
-                    radius: 19,
-                    backgroundColor: Colors.black,
-                    child: Icon(Icons.person_outline, size: 21, color: Colors.white),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          match.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          match.number,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Color(0xFFAAAAAA),
-                            fontSize: 13,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Icon(Icons.chevron_right, color: Color(0xFF777777)),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
   Widget _buildCallActions(PendingCall pending) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -780,134 +595,133 @@ class _PhoneHomePageState extends State<PhoneHomePage>
   }
 
   Widget _buildRecents() {
-    if (_recents.isEmpty) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(28),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.phone_in_talk_outlined,
-                size: 42,
-                color: Color(0xFF9A9A9A),
-              ),
-              SizedBox(height: 12),
-              Text(
-                'لا توجد مكالمات حديثة',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 17,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
+    final query = _recentSearchController.text.trim().toLowerCase();
+    final visibleRecents = _recents.where((entry) {
+      final searchable = '${entry.name ?? ''} ${entry.number}'.toLowerCase();
+      return searchable.contains(query);
+    }).toList(growable: false);
 
     return Column(
       children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(18, 16, 18, 8),
+          child: TextField(
+            key: const Key('recent_search_field'),
+            controller: _recentSearchController,
+            onChanged: (_) => setState(() {}),
+            style: const TextStyle(color: Colors.white, fontSize: 16),
+            cursorColor: Colors.white,
+            decoration: InputDecoration(
+              hintText: 'بحث',
+              hintStyle: const TextStyle(color: Color(0xFF888888)),
+              prefixIcon: const Icon(Icons.search, color: Color(0xFFAAAAAA)),
+              suffixIcon: _recentSearchController.text.isEmpty
+                  ? null
+                  : IconButton(
+                      tooltip: 'مسح البحث',
+                      onPressed: () {
+                        _recentSearchController.clear();
+                        setState(() {});
+                      },
+                      icon: const Icon(Icons.close, color: Color(0xFFAAAAAA)),
+                    ),
+              filled: true,
+              fillColor: Colors.black,
+              contentPadding: const EdgeInsets.symmetric(vertical: 12),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(color: Color(0xFF333333)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(color: Color(0xFF777777)),
+              ),
+            ),
+          ),
+        ),
         if (_pendingCall != null)
           Padding(
-            padding: const EdgeInsets.fromLTRB(18, 14, 18, 0),
+            padding: const EdgeInsets.fromLTRB(18, 6, 18, 0),
             child: _buildCallActions(_pendingCall!),
           ),
         Expanded(
-          child: ListView.separated(
-            padding: const EdgeInsets.fromLTRB(18, 14, 18, 24),
-            itemCount: _recents.length,
-            separatorBuilder: (_, __) => const Divider(
-              height: 1,
-              color: Color(0xFF1B1B1B),
-            ),
-            itemBuilder: (context, index) {
-              final entry = _recents[index];
-              return InkWell(
-                key: Key('recent_call_entry_$index'),
-                onTap: () => _selectCall(
-                  entry.number,
-                  name: entry.name,
-                ),
-                borderRadius: BorderRadius.circular(18),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 12,
+          child: visibleRecents.isEmpty
+              ? Center(
+                  child: Text(
+                    query.isEmpty ? 'لا توجد مكالمات حديثة' : 'لا توجد نتائج',
+                    style: const TextStyle(
+                      color: Color(0xFFAAAAAA),
+                      fontSize: 15,
+                    ),
                   ),
-                  child: Row(
-                    children: [
-                      const CircleAvatar(
-                        radius: 22,
-                        backgroundColor: Colors.black,
-                        child: Icon(
-                          Icons.call_made,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                )
+              : ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(18, 6, 18, 20),
+                  itemCount: visibleRecents.length,
+                  separatorBuilder: (_, __) => const Divider(
+                    height: 1,
+                    color: Color(0xFF1B1B1B),
+                  ),
+                  itemBuilder: (context, index) {
+                    final entry = visibleRecents[index];
+                    return InkWell(
+                      key: Key('recent_call_entry_$index'),
+                      onTap: () => _selectCall(entry.number, name: entry.name),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        child: Row(
                           children: [
-                            if (entry.name != null &&
-                                entry.name!.isNotEmpty)
-                              Text(
-                                entry.name!,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            Text(
-                              entry.number,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: Color(0xFFC7C7C7),
-                                fontSize: 14,
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  if (entry.name != null && entry.name!.isNotEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.only(bottom: 3),
+                                      child: Text(
+                                        entry.name!,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ),
+                                  Text(
+                                    entry.number,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: Color(0xFFCCCCCC),
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    _formatTime(entry.time),
+                                    style: const TextStyle(
+                                      color: Color(0xFF888888),
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                            const SizedBox(height: 2),
-                            Text(
-                              _formatTime(entry.time),
-                              style: const TextStyle(
-                                color: Color(0xFFA8A8A8),
-                                fontSize: 12,
-                              ),
-                            ),
+                            const SizedBox(width: 12),
+                            const Icon(Icons.call, color: Colors.white, size: 19),
                           ],
                         ),
                       ),
-                      const Icon(
-                        Icons.chevron_right,
-                        color: Color(0xFF9A9A9A),
-                      ),
-                    ],
-                  ),
+                    );
+                  },
                 ),
-              );
-            },
-          ),
         ),
       ],
     );
   }
-}
 
-class _ContactMatch {
-  const _ContactMatch({
-    required this.name,
-    required this.number,
-  });
-
-  final String name;
-  final String number;
 }
 
 class _DialKey extends StatelessWidget {
