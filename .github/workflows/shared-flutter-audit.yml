@@ -8,17 +8,10 @@ on:
 
 permissions:
   contents: read
-  pull-requests: read
 
 jobs:
   flutter-quality-and-security:
-    permissions:
-      actions: read
-      attestations: write
-      contents: read
-      id-token: write
-      pull-requests: read
-    uses: TomasThrawat/hyouka-flutter-workflows/.github/workflows/flutter-ci.yml@v1.1.8
+    uses: TomasThrawat/hyouka-flutter-workflows/.github/workflows/flutter-ci.yml@v1.1.7
     with:
       run-analyze: true
       run-tests: true

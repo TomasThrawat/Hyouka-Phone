@@ -498,6 +498,89 @@ jobs:
                   }
               }
 
+              public static void toggleBluetooth() {
+                  if (instance == null || currentCall == null) {
+                      return;
+                  }
+
+                  if (Build.VERSION.SDK_INT >= 34) {
+                      CallEndpoint current = instance.getCurrentCallEndpoint();
+                      int desiredType = current != null
+                              && current.getEndpointType() == CallEndpoint.TYPE_BLUETOOTH
+                          ? CallEndpoint.TYPE_EARPIECE
+                          : CallEndpoint.TYPE_BLUETOOTH;
+                      synchronized (availableEndpoints) {
+                          for (CallEndpoint endpoint : availableEndpoints) {
+                              if (endpoint.getEndpointType() == desiredType) {
+                                  instance.requestCallEndpointChange(
+                                      endpoint,
+                                      instance.getMainExecutor(),
+                                      new android.os.OutcomeReceiver<Void, CallEndpointException>() {
+                                          @Override
+                                          public void onResult(Void result) {
+                                              instance.broadcastUpdate();
+                                          }
+
+                                          @Override
+                                          public void onError(CallEndpointException error) {
+                                              instance.broadcastUpdate();
+                                          }
+                                      }
+                                  );
+                                  return;
+                              }
+                          }
+                      }
+                      instance.broadcastUpdate();
+                      return;
+                  }
+
+                  CallAudioState state = instance.getCallAudioState();
+                  if (state == null
+                      || (state.getSupportedRouteMask() & CallAudioState.ROUTE_BLUETOOTH) == 0) {
+                      instance.broadcastUpdate();
+                      return;
+                  }
+                  int target = state.getRoute() == CallAudioState.ROUTE_BLUETOOTH
+                      ? CallAudioState.ROUTE_EARPIECE
+                      : CallAudioState.ROUTE_BLUETOOTH;
+                  instance.setAudioRoute(target);
+                  legacyAudioRoute = target;
+                  instance.broadcastUpdate();
+              }
+
+              public static boolean isBluetoothAvailable() {
+                  if (instance == null || currentCall == null) {
+                      return false;
+                  }
+                  if (Build.VERSION.SDK_INT >= 34) {
+                      synchronized (availableEndpoints) {
+                          for (CallEndpoint endpoint : availableEndpoints) {
+                              if (endpoint.getEndpointType() == CallEndpoint.TYPE_BLUETOOTH) {
+                                  return true;
+                              }
+                          }
+                      }
+                      return false;
+                  }
+                  CallAudioState state = instance.getCallAudioState();
+                  return state != null
+                      && (state.getSupportedRouteMask() & CallAudioState.ROUTE_BLUETOOTH) != 0;
+              }
+
+              public static boolean isBluetooth() {
+                  if (instance == null) {
+                      return false;
+                  }
+                  if (Build.VERSION.SDK_INT >= 34) {
+                      CallEndpoint endpoint = instance.getCurrentCallEndpoint();
+                      return endpoint != null
+                          && endpoint.getEndpointType() == CallEndpoint.TYPE_BLUETOOTH;
+                  }
+                  syncLegacyAudioRoute();
+                  return legacyAudioRoute == CallAudioState.ROUTE_BLUETOOTH;
+              }
+
               private static void setLegacySpeakerRoute(PhoneInCallService service) {
                   CallAudioState state = service.getCallAudioState();
                   if (state != null) legacyAudioRoute = state.getRoute();
@@ -696,6 +779,7 @@ jobs:
               private Button rejectButton;
               private Button muteButton;
               private Button speakerButton;
+              private Button bluetoothButton;
               private Button endButton;
 
               private long connectTimeMillis;
@@ -987,6 +1071,12 @@ jobs:
                       v -> PhoneInCallService.toggleSpeaker()
                   );
 
+                  bluetoothButton = makeControlButton("بلوتوث");
+                  bluetoothButton.setContentDescription("التبديل إلى سماعة البلوتوث");
+                  bluetoothButton.setOnClickListener(
+                      v -> PhoneInCallService.toggleBluetooth()
+                  );
+
                   LinearLayout.LayoutParams controlParams = weightParams(1f);
                   controlParams.setMargins(dp(6), 0, dp(6), 0);
                   ongoingActions.addView(muteButton, controlParams);
@@ -994,6 +1084,10 @@ jobs:
                   controlParams = weightParams(1f);
                   controlParams.setMargins(dp(6), 0, dp(6), 0);
                   ongoingActions.addView(speakerButton, controlParams);
+
+                  controlParams = weightParams(1f);
+                  controlParams.setMargins(dp(6), 0, dp(6), 0);
+                  ongoingActions.addView(bluetoothButton, controlParams);
 
                   root.addView(ongoingActions, ongoingParams);
 
@@ -1132,17 +1226,28 @@ jobs:
                           ? "إلغاء الكتم"
                           : "كتم"
                   );
+                  boolean speakerEnabled = PhoneInCallService.isSpeaker();
                   speakerButton.setText(
-                      PhoneInCallService.isSpeaker()
-                          ? "السماعة"
-                          : "الميكروفون"
+                      speakerEnabled ? "السماعة الخارجية" : "سماعة الهاتف"
                   );
                   speakerButton.setContentDescription(
-                      PhoneInCallService.isSpeaker()
-                          ? "السماعة، اضغط للتبديل"
-                          : "الميكروفون، اضغط للتبديل"
+                      speakerEnabled
+                          ? "الصوت على السماعة الخارجية، اضغط للتبديل"
+                          : "الصوت على سماعة الهاتف، اضغط للتبديل"
                   );
-
+                  
+                  boolean bluetoothAvailable = PhoneInCallService.isBluetoothAvailable();
+                  bluetoothButton.setVisibility(
+                      bluetoothAvailable ? View.VISIBLE : View.GONE
+                  );
+                  bluetoothButton.setText(
+                      PhoneInCallService.isBluetooth() ? "بلوتوث ✓" : "بلوتوث"
+                  );
+                  bluetoothButton.setContentDescription(
+                      PhoneInCallService.isBluetooth()
+                          ? "الصوت على سماعة البلوتوث، اضغط للعودة إلى سماعة الهاتف"
+                          : "التبديل إلى سماعة البلوتوث"
+                  );
                   renderTimer();
               }
 
@@ -1353,6 +1458,11 @@ jobs:
            grep -n 'onCallAudioStateChanged' android/app/src/main/java/com/dailer/phone/PhoneInCallService.java
            grep -n 'legacyAudioRoute' android/app/src/main/java/com/dailer/phone/PhoneInCallService.java
            grep -n 'setAudioRoute' android/app/src/main/java/com/dailer/phone/PhoneInCallService.java
+           grep -n 'public static void toggleBluetooth()' android/app/src/main/java/com/dailer/phone/PhoneInCallService.java
+           grep -n 'CallEndpoint.TYPE_BLUETOOTH' android/app/src/main/java/com/dailer/phone/PhoneInCallService.java
+           grep -n 'CallAudioState.ROUTE_BLUETOOTH' android/app/src/main/java/com/dailer/phone/PhoneInCallService.java
+           grep -n 'isBluetoothAvailable' android/app/src/main/java/com/dailer/phone/InCallActivity.java
+           grep -n 'bluetoothButton' android/app/src/main/java/com/dailer/phone/InCallActivity.java
           if grep -nF 'new Notification.Builder(this)' android/app/src/main/java/com/dailer/phone/PhoneInCallService.java; then
             echo "Unexpected deprecated Notification.Builder constructor found." >&2
             exit 1

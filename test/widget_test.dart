@@ -317,22 +317,24 @@ void main() {
     'recents search exposes a localized semantic label',
     (tester) async {
       final semantics = tester.ensureSemantics();
-      addTearDown(semantics.dispose);
+      try {
+        tester.view.physicalSize = const Size(1080, 2400);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.reset);
 
-      tester.view.physicalSize = const Size(1080, 2400);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(tester.view.reset);
+        await tester.pumpWidget(
+          const PhoneApp(enableDefaultDialerPrompt: false),
+        );
+        await tester.tap(find.byIcon(Icons.history_outlined));
+        await tester.pumpAndSettle();
 
-      await tester.pumpWidget(
-        const PhoneApp(enableDefaultDialerPrompt: false),
-      );
-      await tester.tap(find.byIcon(Icons.history_outlined));
-      await tester.pumpAndSettle();
-
-      expect(
-        find.bySemanticsLabel('بحث'),
-        findsOneWidget,
-      );
+        expect(
+          find.bySemanticsLabel('بحث'),
+          findsOneWidget,
+        );
+      } finally {
+        semantics.dispose();
+      }
     },
   );
 }
