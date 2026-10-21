@@ -48,6 +48,7 @@ jobs:
           import android.os.Build;
           import android.os.Bundle;
           import android.provider.CallLog;
+          import android.provider.ContactsContract;
           import android.provider.Settings;
           import android.telecom.TelecomManager;
 
@@ -66,6 +67,7 @@ jobs:
               private static final String CHANNEL = "com.dailer.phone/default_dialer";
               private static final int CALL_PERMISSION_REQUEST_CODE = 9002;
               private static final int CALL_LOG_PERMISSION_REQUEST_CODE = 9003;
+              private static final String CONTACTS_PERMISSION_REQUESTED_KEY = "contacts_permission_requested";
 
               private MethodChannel.Result pendingCallResult;
               private String pendingNumber;
@@ -153,24 +155,38 @@ jobs:
               }
 
               private void getRecentCalls(MethodChannel.Result result) {
-                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
-                      && checkSelfPermission(Manifest.permission.READ_CALL_LOG)
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                      List<String> permissionsToRequest = new ArrayList<>();
+                      if (checkSelfPermission(Manifest.permission.READ_CALL_LOG)
                           != PackageManager.PERMISSION_GRANTED) {
-                      if (callLogPermissionRequestInProgress) {
-                          result.error(
-                              "CALL_LOG_PERMISSION_BUSY",
-                              "Call-log permission request is already in progress",
-                              null
+                          permissionsToRequest.add(Manifest.permission.READ_CALL_LOG);
+                      }
+                      boolean contactsPermissionRequested = getPreferences(MODE_PRIVATE).getBoolean(
+                          CONTACTS_PERMISSION_REQUESTED_KEY, false);
+                      if (checkSelfPermission(Manifest.permission.READ_CONTACTS)
+                          != PackageManager.PERMISSION_GRANTED && !contactsPermissionRequested) {
+                          permissionsToRequest.add(Manifest.permission.READ_CONTACTS);
+                          getPreferences(MODE_PRIVATE).edit()
+                              .putBoolean(CONTACTS_PERMISSION_REQUESTED_KEY, true)
+                              .apply();
+                      }
+                      if (!permissionsToRequest.isEmpty()) {
+                          if (callLogPermissionRequestInProgress) {
+                              result.error(
+                                  "CALL_LOG_PERMISSION_BUSY",
+                                  "Call-log/contact permission request is already in progress",
+                                  null
+                              );
+                              return;
+                          }
+                          pendingCallLogResult = result;
+                          callLogPermissionRequestInProgress = true;
+                          requestPermissions(
+                              permissionsToRequest.toArray(new String[0]),
+                              CALL_LOG_PERMISSION_REQUEST_CODE
                           );
                           return;
                       }
-                      pendingCallLogResult = result;
-                      callLogPermissionRequestInProgress = true;
-                      requestPermissions(
-                          new String[]{Manifest.permission.READ_CALL_LOG},
-                          CALL_LOG_PERMISSION_REQUEST_CODE
-                      );
-                      return;
                   }
                   result.success(readRecentCalls());
               }
@@ -191,21 +207,22 @@ jobs:
                           CallLog.Calls.DATE + " DESC"
                       );
                       if (cursor == null) return calls;
-
                       int numberIndex = cursor.getColumnIndex(CallLog.Calls.NUMBER);
                       int nameIndex = cursor.getColumnIndex(CallLog.Calls.CACHED_NAME);
                       int dateIndex = cursor.getColumnIndex(CallLog.Calls.DATE);
                       while (cursor.moveToNext() && calls.size() < 50) {
                           Map<String, Object> entry = new HashMap<>();
-                          if (numberIndex >= 0) {
-                              entry.put("number", cursor.getString(numberIndex));
+                          String number = numberIndex >= 0 ? cursor.getString(numberIndex) : null;
+                          String cachedName = nameIndex >= 0 ? cursor.getString(nameIndex) : null;
+                          if (number != null) entry.put("number", number);
+                          String resolvedName = PhoneInCallService.lookupContactName(this, number);
+                          if (resolvedName == null || resolvedName.trim().isEmpty()) {
+                              resolvedName = cachedName;
                           }
-                          if (nameIndex >= 0) {
-                              entry.put("name", cursor.getString(nameIndex));
+                          if (resolvedName != null && !resolvedName.trim().isEmpty()) {
+                              entry.put("name", resolvedName.trim());
                           }
-                          if (dateIndex >= 0) {
-                              entry.put("time", cursor.getLong(dateIndex));
-                          }
+                          if (dateIndex >= 0) entry.put("time", cursor.getLong(dateIndex));
                           calls.add(entry);
                       }
                   } catch (SecurityException ignored) {
@@ -261,9 +278,9 @@ jobs:
                       pendingCallLogResult = null;
                       callLogPermissionRequestInProgress = false;
                       if (result == null) return;
-
-                      if (grantResults.length > 0
-                          && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                      if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M
+                          || checkSelfPermission(Manifest.permission.READ_CALL_LOG)
+                          == PackageManager.PERMISSION_GRANTED) {
                           result.success(readRecentCalls());
                       } else {
                           result.error(
@@ -301,7 +318,12 @@ jobs:
           import android.app.NotificationChannel;
           import android.app.NotificationManager;
           import android.app.PendingIntent;
+          import android.Manifest;
           import android.content.Context;
+          import android.content.pm.PackageManager;
+          import android.database.Cursor;
+          import android.net.Uri;
+          import android.provider.ContactsContract;
           import android.content.Intent;
           import android.os.Build;
           import android.telecom.Call;
@@ -338,6 +360,41 @@ jobs:
                       }
                   }
               };
+
+              public static String lookupContactName(Context context, String number) {
+                  if (context == null || number == null || number.trim().isEmpty()) return null;
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+                      && context.checkSelfPermission(Manifest.permission.READ_CONTACTS)
+                      != PackageManager.PERMISSION_GRANTED) {
+                      return null;
+                  }
+                  Cursor cursor = null;
+                  try {
+                      Uri lookupUri = Uri.withAppendedPath(
+                          ContactsContract.PhoneLookup.CONTENT_FILTER_URI,
+                          Uri.encode(number.trim())
+                      );
+                      cursor = context.getContentResolver().query(
+                          lookupUri,
+                          new String[]{ContactsContract.PhoneLookup.DISPLAY_NAME},
+                          null,
+                          null,
+                          null
+                      );
+                      if (cursor != null && cursor.moveToFirst()) {
+                          int nameIndex = cursor.getColumnIndex(ContactsContract.PhoneLookup.DISPLAY_NAME);
+                          if (nameIndex >= 0) {
+                              String name = cursor.getString(nameIndex);
+                              if (name != null && !name.trim().isEmpty()) return name.trim();
+                          }
+                      }
+                  } catch (SecurityException | IllegalArgumentException ignored) {
+                      // Missing permission or an unavailable provider should not break call UI.
+                  } finally {
+                      if (cursor != null) cursor.close();
+                  }
+                  return null;
+              }
 
               public static Call getCurrentCall() {
                   return currentCall;
@@ -661,14 +718,21 @@ jobs:
                       PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
                   );
 
-                  String title = currentCall.getDetails().getHandle() == null
-                      ? "مكالمة"
+                  String phoneNumber = currentCall.getDetails().getHandle() == null
+                      ? null
                       : currentCall.getDetails().getHandle().getSchemeSpecificPart();
+                  String title = phoneNumber == null || phoneNumber.trim().isEmpty()
+                      ? "مكالمة"
+                      : phoneNumber;
                   if (Build.VERSION.SDK_INT >= 30) {
                       String contactName = currentCall.getDetails().getContactDisplayName();
                       if (contactName != null && !contactName.trim().isEmpty()) {
                           title = contactName.trim();
                       }
+                  }
+                  String savedContactName = lookupContactName(this, phoneNumber);
+                  if (savedContactName != null && !savedContactName.trim().isEmpty()) {
+                      title = savedContactName.trim();
                   }
                   if (title == null || title.trim().isEmpty()) {
                       title = "مكالمة";
@@ -1146,28 +1210,21 @@ jobs:
                   if (call == null || call.getDetails() == null) {
                       return null;
                   }
-
                   if (Build.VERSION.SDK_INT >= 30) {
                       String contactName = call.getDetails().getContactDisplayName();
                       if (!TextUtils.isEmpty(contactName)) {
                           return contactName.trim();
                       }
                   }
-
                   String callerName = call.getDetails().getCallerDisplayName();
                   if (!TextUtils.isEmpty(callerName)) {
                       return callerName.trim();
                   }
-
-                  return null;
-              }
-
-              private String avatarLetter(String name, String number) {
-                  String source = !TextUtils.isEmpty(name) ? name : number;
-                  if (TextUtils.isEmpty(source)) {
-                      return "?";
+                  String savedContactName = PhoneInCallService.lookupContactName(this, safeNumber(call));
+                  if (!TextUtils.isEmpty(savedContactName)) {
+                      return savedContactName;
                   }
-                  return source.substring(0, 1).toUpperCase(Locale.getDefault());
+                  return null;
               }
 
               private void render() {
@@ -1326,6 +1383,7 @@ jobs:
 
           permissions = [
               '<uses-permission android:name="android.permission.READ_CALL_LOG"/>',
+              '<uses-permission android:name="android.permission.READ_CONTACTS"/>',
               '<uses-permission android:name="android.permission.CALL_PHONE"/>',
               '<uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>',
               '<uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/>',
@@ -1429,6 +1487,7 @@ jobs:
           grep -n 'android.telecom.IN_CALL_SERVICE_UI' android/app/src/main/AndroidManifest.xml
           grep -n 'android:name=".InCallActivity"' android/app/src/main/AndroidManifest.xml
           grep -n 'android.permission.READ_CALL_LOG' android/app/src/main/AndroidManifest.xml
+          grep -n 'android.permission.READ_CONTACTS' android/app/src/main/AndroidManifest.xml
           grep -n 'android.permission.READ_PHONE_STATE' android/app/src/main/AndroidManifest.xml
           grep -n 'android.permission.ANSWER_PHONE_CALLS' android/app/src/main/AndroidManifest.xml
           grep -n 'android.permission.CALL_PHONE' android/app/src/main/AndroidManifest.xml
@@ -1443,9 +1502,12 @@ jobs:
           grep -n 'class PhoneInCallService extends InCallService' android/app/src/main/java/com/dailer/phone/PhoneInCallService.java
           grep -n '@SuppressWarnings(\"deprecation\")' android/app/src/main/java/com/dailer/phone/PhoneInCallService.java
           grep -n 'class InCallActivity extends Activity' android/app/src/main/java/com/dailer/phone/InCallActivity.java
+          grep -n 'PhoneInCallService.lookupContactName' android/app/src/main/java/com/dailer/phone/InCallActivity.java
           grep -n 'TelecomManager' android/app/src/main/java/com/dailer/phone/MainActivity.java
           grep -n 'placeCall' android/app/src/main/java/com/dailer/phone/MainActivity.java
            grep -n 'getRecentCalls' android/app/src/main/java/com/dailer/phone/MainActivity.java
+           grep -n 'PhoneInCallService.lookupContactName' android/app/src/main/java/com/dailer/phone/MainActivity.java
+           grep -n 'ContactsContract.PhoneLookup.CONTENT_FILTER_URI' android/app/src/main/java/com/dailer/phone/PhoneInCallService.java
            grep -n 'READ_CALL_LOG' android/app/src/main/java/com/dailer/phone/MainActivity.java
           if grep -nE 'window\.setShowWhenLocked|window\.setTurnScreenOn' android/app/src/main/java/com/dailer/phone/InCallActivity.java; then
             echo "Unexpected legacy lock-screen window API found." >&2
