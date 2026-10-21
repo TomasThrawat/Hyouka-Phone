@@ -1339,19 +1339,40 @@ jobs:
           grep -n 'placeCall' android/app/src/main/java/com/dailer/phone/MainActivity.java
            grep -n 'getRecentCalls' android/app/src/main/java/com/dailer/phone/MainActivity.java
            grep -n 'READ_CALL_LOG' android/app/src/main/java/com/dailer/phone/MainActivity.java
-          ! grep -n 'window.setShowWhenLocked\|window.setTurnScreenOn' android/app/src/main/java/com/dailer/phone/InCallActivity.java
-          ! grep -n 'startActivityForResult' android/app/src/main/java/com/dailer/phone/MainActivity.java
+          if grep -nE 'window\.setShowWhenLocked|window\.setTurnScreenOn' android/app/src/main/java/com/dailer/phone/InCallActivity.java; then
+            echo "Unexpected legacy lock-screen window API found." >&2
+            exit 1
+          fi
+          if grep -nF 'startActivityForResult' android/app/src/main/java/com/dailer/phone/MainActivity.java; then
+            echo "Unexpected deprecated startActivityForResult call found." >&2
+            exit 1
+          fi
            grep -n 'onCallAudioStateChanged' android/app/src/main/java/com/dailer/phone/PhoneInCallService.java
            grep -n 'legacyAudioRoute' android/app/src/main/java/com/dailer/phone/PhoneInCallService.java
            grep -n 'setAudioRoute' android/app/src/main/java/com/dailer/phone/PhoneInCallService.java
-          ! grep -n 'new Notification.Builder(this)' android/app/src/main/java/com/dailer/phone/PhoneInCallService.java
-          ! grep -n '\.getState()' android/app/src/main/java/com/dailer/phone/PhoneInCallService.java
-          ! grep -n '\.getState()' android/app/src/main/java/com/dailer/phone/InCallActivity.java
-          ! grep -n 'WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED\|WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON' android/app/src/main/java/com/dailer/phone/InCallActivity.java
+          if grep -nF 'new Notification.Builder(this)' android/app/src/main/java/com/dailer/phone/PhoneInCallService.java; then
+            echo "Unexpected deprecated Notification.Builder constructor found." >&2
+            exit 1
+          fi
+          if grep -nE '(currentCall|call)\.getState\(\)' android/app/src/main/java/com/dailer/phone/PhoneInCallService.java; then
+            echo "Unexpected direct Call.getState() API call found; use getDetails().getState()." >&2
+            exit 1
+          fi
+          if grep -nE '(currentCall|call)\.getState\(\)' android/app/src/main/java/com/dailer/phone/InCallActivity.java; then
+            echo "Unexpected direct Call.getState() API call found; use getDetails().getState()." >&2
+            exit 1
+          fi
+          if grep -nE 'WindowManager\.LayoutParams\.FLAG_SHOW_WHEN_LOCKED|WindowManager\.LayoutParams\.FLAG_TURN_SCREEN_ON' android/app/src/main/java/com/dailer/phone/InCallActivity.java; then
+            echo "Unexpected legacy lock-screen window flag found." >&2
+            exit 1
+          fi
           grep -n 'getContactDisplayName' android/app/src/main/java/com/dailer/phone/InCallActivity.java
           grep -n 'رفض المكالمة' android/app/src/main/java/com/dailer/phone/InCallActivity.java
           grep -n 'الرد على المكالمة' android/app/src/main/java/com/dailer/phone/InCallActivity.java
-          ! grep -n 'root.setPadding(32, 64, 32, 40)' android/app/src/main/java/com/dailer/phone/InCallActivity.java
+          if grep -nF 'root.setPadding(32, 64, 32, 40)' android/app/src/main/java/com/dailer/phone/InCallActivity.java; then
+            echo "Unexpected obsolete in-call layout padding found." >&2
+            exit 1
+          fi
 
       - name: Analyze
         run: flutter analyze
