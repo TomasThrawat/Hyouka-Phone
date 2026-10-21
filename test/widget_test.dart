@@ -273,6 +273,13 @@ void main() {
     expect(find.byKey(const Key('recent_call_entry_0')), findsOneWidget);
     expect(find.text('789'), findsOneWidget);
     expect(find.text('History contact'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('recent_call_entry_0')),
+        matching: find.byIcon(Icons.call),
+      ),
+      findsNothing,
+    );
   });
 
   testWidgets('recents search filters by caller name and number', (tester) async {

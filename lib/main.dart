@@ -710,7 +710,7 @@ class _PhoneHomePageState extends State<PhoneHomePage>
                               ),
                             ),
                             const SizedBox(width: 12),
-                            const Icon(Icons.call, color: Colors.white, size: 19),
+
                           ],
                         ),
                       ),
